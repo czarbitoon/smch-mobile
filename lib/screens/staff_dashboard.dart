@@ -65,69 +65,6 @@ class StaffDashboard extends StatelessWidget {
                 );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.description),
-              title: const Text('Reports'),
-              onTap: () {
-                // TODO: Navigate to reports screen
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        ),
-      ),
-      body: GridView.count(
-        padding: const EdgeInsets.all(16),
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        children: [
-          _buildDashboardCard(
-            context,
-            'Devices',
-            Icons.devices,
-            () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DeviceManagementScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDashboardCard(
-            context,
-            'Reports',
-            Icons.description,
-            () {
-              // TODO: Navigate to reports screen
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDashboardCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 48, color: Theme.of(context).primaryColor),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),

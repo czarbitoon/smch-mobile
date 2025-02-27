@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/device_provider.dart';
 import '../providers/office_provider.dart';
+import '../widgets/device_filters.dart';
+import '../widgets/device_card.dart';
 
 class DeviceManagementScreen extends StatefulWidget {
   const DeviceManagementScreen({super.key});
@@ -18,6 +20,66 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   String? _selectedStatus;
 
   final List<String> _statusOptions = ['Available', 'In Use', 'Maintenance', 'Retired'];
+
+  String? _filterStatus = null;
+  String? _filterOffice = null;
+  String? _filterType = null;
+  final Set<String> _deviceTypes = {};
+
+  Future<void> _deleteDevice(int deviceId) async {
+    try {
+      if (deviceId <= 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invalid device ID')),
+          );
+        }
+        return;
+      }
+  
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: const Text('Are you sure you want to delete this device?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+  
+      if (confirmed == true) {
+        final success = await context.read<DeviceProvider>().deleteDevice(deviceId);
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Device deleted successfully')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(context.read<DeviceProvider>().error ?? 'Failed to delete device')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete device: ${e.toString()}')),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -37,15 +99,18 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Device Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showDeviceDialog(),
-          ),
-        ],
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 2,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showDeviceDialog(),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Device'),
       ),
       body: Consumer2<DeviceProvider, OfficeProvider>(
         builder: (context, deviceProvider, officeProvider, child) {
@@ -57,48 +122,59 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
             return Center(child: Text(deviceProvider.error!));
           }
 
-          if (deviceProvider.devices.isEmpty) {
-            return const Center(child: Text('No devices found'));
-          }
-
-          return ListView.builder(
-            itemCount: deviceProvider.devices.length,
-            itemBuilder: (context, index) {
-              final device = deviceProvider.devices[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  title: Text(device['name']),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Type: ${device['type']}'),
-                      Text('Status: ${device['status']}'),
-                      Text('Office: ${device['office_name'] ?? 'Not assigned'}'),
-                    ],
-                  ),
-                  trailing: PopupMenuButton(
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _showDeviceDialog(device: device);
-                      } else if (value == 'delete') {
-                        _showDeleteConfirmation(device);
-                      }
-                    },
-                  ),
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: deviceProvider.devices.length,
+                  itemBuilder: (context, index) {
+                    final device = deviceProvider.devices[index];
+                    return DeviceCard(
+                      device: device,
+                      onEdit: () => _showDeviceDialog(device: device),
+                      onDelete: () => _deleteDevice(device['id']),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total: ${deviceProvider.total}'),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left),
+                          onPressed: deviceProvider.currentPage > 1
+                              ? () => deviceProvider.previousPage()
+                              : null,
+                        ),
+                        Text('${deviceProvider.currentPage} / ${deviceProvider.lastPage}'),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right),
+                          onPressed: deviceProvider.currentPage < deviceProvider.lastPage
+                              ? () => deviceProvider.nextPage()
+                              : null,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -119,7 +195,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
       _selectedOffice = null;
       _selectedStatus = _statusOptions.first;
     }
-
+  
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -199,10 +275,10 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                 final deviceData = {
                   'name': _nameController.text,
                   'type': _typeController.text,
-                  'office_id': _selectedOffice,
+                  'office_id': _selectedOffice != null ? int.parse(_selectedOffice!) : null,
                   'status': _selectedStatus,
                 };
-
+  
                 final success = isEditing
                     ? await context
                         .read<DeviceProvider>()
@@ -210,7 +286,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                     : await context
                         .read<DeviceProvider>()
                         .createDevice(deviceData);
-
+  
                 if (mounted) {
                   Navigator.pop(context);
                   if (!success) {

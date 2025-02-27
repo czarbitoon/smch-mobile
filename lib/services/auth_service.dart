@@ -6,6 +6,33 @@ class AuthService {
   static const String baseUrl = 'http://127.0.0.1:8000/api';
   final _storage = const FlutterSecureStorage();
 
+  Future<Map<String, dynamic>?> getCurrentUser() async {
+    print('[AuthService] Getting current user');
+    try {
+      final userStr = await _storage.read(key: 'user');
+      print('[AuthService] Stored user data found: ${userStr != null}');
+      if (userStr != null) {
+        try {
+          final userData = json.decode(userStr) as Map<String, dynamic>;
+          if (!userData.containsKey('type')) {
+            print('[AuthService] User data missing type field');
+            return null;
+          }
+          print('[AuthService] Current user type: ${userData['type']}');
+          return userData;
+        } catch (e) {
+          print('[AuthService] Error parsing user data: $e');
+          return null;
+        }
+      }
+      print('[AuthService] No user data found');
+      return null;
+    } catch (e) {
+      print('[AuthService] Error getting current user: $e');
+      return null;
+    }
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     print('[AuthService] Attempting login for email: $email');
     try {
@@ -21,30 +48,53 @@ class AuthService {
           'password': password,
         }),
       );
-
+      
       print('[AuthService] Login response status: ${response.statusCode}');
-      print('[AuthService] Login response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        print('[AuthService] Login request successful');
-        final data = json.decode(response.body);
-        
-        if (data['token'] == null) {
-          print('[AuthService] Error: No token received in response');
-          return {'success': false, 'message': 'Invalid server response: No token received'};
+      if (response.statusCode != 200) {
+        print('[AuthService] Login failed with status ${response.statusCode}');
+        try {
+          final error = json.decode(response.body);
+          return {'success': false, 'message': error['message'] ?? 'Authentication failed'};
+        } catch (e) {
+          return {'success': false, 'message': 'Server error: ${response.statusCode}'};
         }
-
-        print('[AuthService] Token received, storing credentials');
-        await _storage.write(key: 'token', value: data['token']);
-        await _storage.write(key: 'user', value: json.encode(data['user']));
-        
-        print('[AuthService] Login successful. User type: ${data['user']['type']}');
-        return {'success': true, 'user': data['user']};
-      } else {
-        final error = json.decode(response.body);
-        print('[AuthService] Login failed with status ${response.statusCode}: ${error['message']}');
-        return {'success': false, 'message': error['message'] ?? 'Authentication failed'};
       }
+
+      print('[AuthService] Login request successful');
+      Map<String, dynamic> data;
+      try {
+        data = json.decode(response.body);
+      } catch (e) {
+        print('[AuthService] JSON parsing error: $e');
+        return {'success': false, 'message': 'Invalid response format'};
+      }
+
+      // Check for access_token or token in response
+      final token = data['access_token'] ?? data['token'];
+      if (token == null) {
+        print('[AuthService] Error: No token received in response');
+        return {'success': false, 'message': 'Invalid server response: No token received'};
+      }
+
+      // Validate user type
+      final userType = data['type'];
+      if (userType == null) {
+        print('[AuthService] Error: User type not found in response');
+        return {'success': false, 'message': 'Invalid response: missing user type'};
+      }
+
+      // Create user data map
+      final userData = {
+        'type': userType,
+        'office_id': data['office_id']
+      };
+
+      print('[AuthService] Token received, storing credentials');
+      await _storage.write(key: 'token', value: token);
+      await _storage.write(key: 'user', value: json.encode(userData));
+      
+      print('[AuthService] Login successful. User type: ${userData['type']}');
+      return {'success': true, 'user': userData};
     } catch (e) {
       print('[AuthService] Login error: $e');
       if (e is FormatException) {
@@ -76,34 +126,6 @@ class AuthService {
     } catch (e) {
       print('[AuthService] Logout error: $e');
       return false;
-    }
-  }
-
-  Future<Map<String, dynamic>?> getCurrentUser() async {
-    print('[AuthService] Getting current user');
-    try {
-      final userStr = await _storage.read(key: 'user');
-      print('[AuthService] Stored user data found: ${userStr != null}');
-      if (userStr != null) {
-        try {
-          final userData = json.decode(userStr) as Map<String, dynamic>;
-          // Ensure user data has required fields
-          if (!userData.containsKey('type')) {
-            print('[AuthService] User data missing type field');
-            return null;
-          }
-          print('[AuthService] Current user type: ${userData['type']}');
-          return userData;
-        } catch (e) {
-          print('[AuthService] Error parsing user data: $e');
-          return null;
-        }
-      }
-      print('[AuthService] No user data found');
-      return null;
-    } catch (e) {
-      print('[AuthService] Error getting current user: $e');
-      return null;
     }
   }
 

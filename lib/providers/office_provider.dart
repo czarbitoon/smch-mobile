@@ -11,6 +11,21 @@ class OfficeProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  set isLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  set error(String? value) {
+    _error = value;
+    notifyListeners();
+  }
+
+  set offices(List<Map<String, dynamic>> value) {
+    _offices = value;
+    notifyListeners();
+  }
+
   Future<void> loadOffices() async {
     _isLoading = true;
     _error = null;

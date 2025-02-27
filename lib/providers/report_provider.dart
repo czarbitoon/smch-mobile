@@ -111,4 +111,19 @@ class ReportProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  set isLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  set error(String? value) {
+    _error = value;
+    notifyListeners();
+  }
+
+  set notifications(List<Map<String, dynamic>> value) {
+    _notifications = value;
+    notifyListeners();
+  }
 }

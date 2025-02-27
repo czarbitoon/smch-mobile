@@ -1,103 +1,103 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'package:flutter/foundation.dart';
+import 'api_service.dart';
 
 class DeviceService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
-  final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
 
-  Future<Map<String, dynamic>> getDevices() async {
+  Future<Map<String, dynamic>> getDevices({int? page}) async {
     try {
-      final token = await _authService.getToken();
-      final response = await http.get(
-        Uri.parse('$baseUrl/devices'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'devices': data['devices']};
+      final response = await _apiService.get('devices${page != null ? "?page=$page" : ""}');
+      debugPrint('Raw API response: ${json.encode(response)}');
+      
+      if (response['success']) {
+        final dynamic data = response['data'];
+        debugPrint('Processed devices data: ${json.encode(data)}');
+        return {'success': true, 'data': data};
       } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
+        final String errorMessage = response['message']?.toString() ?? 'Unknown error occurred';
+        debugPrint('Failed to fetch devices: $errorMessage');
+        return {'success': false, 'message': errorMessage};
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+    } catch (e, stackTrace) {
+      debugPrint('Error in getDevices: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Failed to fetch devices: $e'};
     }
   }
 
   Future<Map<String, dynamic>> createDevice(Map<String, dynamic> deviceData) async {
     try {
-      final token = await _authService.getToken();
-      final response = await http.post(
-        Uri.parse('$baseUrl/devices'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(deviceData),
-      );
-
-      if (response.statusCode == 201) {
-        final data = json.decode(response.body);
-        return {'success': true, 'device': data['device']};
+      debugPrint('Creating device with data: ${json.encode(deviceData)}');
+      final response = await _apiService.post('devices', deviceData);
+      debugPrint('Create device response: ${json.encode(response)}');
+      
+      if (response['success']) {
+        final device = response['data'];
+        if (device == null) {
+          debugPrint('Warning: Created device data is null');
+          return {'success': false, 'message': 'Device created but no data returned'};
+        }
+        debugPrint('Successfully created device: ${json.encode(device)}');
+        return {'success': true, 'device': device};
       } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
+        final String errorMessage = response['message']?.toString() ?? 'Failed to create device';
+        debugPrint('Failed to create device: $errorMessage');
+        return {'success': false, 'message': errorMessage};
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+    } catch (e, stackTrace) {
+      debugPrint('Error in createDevice: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Failed to create device: $e'};
     }
   }
 
   Future<Map<String, dynamic>> updateDevice(int id, Map<String, dynamic> deviceData) async {
     try {
-      final token = await _authService.getToken();
-      final response = await http.put(
-        Uri.parse('$baseUrl/devices/$id'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode(deviceData),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'device': data['device']};
+      debugPrint('Updating device $id with data: ${json.encode(deviceData)}');
+      final response = await _apiService.post('devices/$id', deviceData);
+      debugPrint('Update device response: ${json.encode(response)}');
+      
+      if (response['success']) {
+        final device = response['data'];
+        if (device == null) {
+          debugPrint('Warning: Updated device data is null');
+          return {'success': false, 'message': 'Device updated but no data returned'};
+        }
+        debugPrint('Successfully updated device: ${json.encode(device)}');
+        return {'success': true, 'device': device};
       } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
+        final String errorMessage = response['message']?.toString() ?? 'Failed to update device';
+        debugPrint('Failed to update device: $errorMessage');
+        return {'success': false, 'message': errorMessage};
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+    } catch (e, stackTrace) {
+      debugPrint('Error in updateDevice: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Failed to update device: $e'};
     }
   }
 
   Future<Map<String, dynamic>> deleteDevice(int id) async {
     try {
-      final token = await _authService.getToken();
-      final response = await http.delete(
-        Uri.parse('$baseUrl/devices/$id'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true};
+      debugPrint('Deleting device $id');
+      final response = await _apiService.post('devices/$id/delete', {});
+      debugPrint('Delete device response: ${json.encode(response)}');
+      
+      if (response['success']) {
+        debugPrint('Successfully deleted device $id');
+        return {'success': true, 'message': 'Device deleted successfully'};
       } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
+        final String errorMessage = response['message']?.toString() ?? 'Failed to delete device';
+        debugPrint('Failed to delete device: $errorMessage');
+        return {'success': false, 'message': errorMessage};
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+    } catch (e, stackTrace) {
+      debugPrint('Error in deleteDevice: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Failed to delete device: $e'};
     }
   }
 }
