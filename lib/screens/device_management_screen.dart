@@ -124,56 +124,197 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
 
           return Column(
             children: [
-              Expanded(
-                child: ListView.builder(
+              DeviceFilters(
+                filterStatus: _filterStatus,
+                filterOffice: _filterOffice,
+                filterType: _filterType,
+                statusOptions: _statusOptions,
+                deviceTypes: _deviceTypes,
+                onStatusChanged: (value) {
+                  setState(() {
+                    _filterStatus = value;
+                  });
+                  deviceProvider.applyFilters({
+                    'status': value,
+                    'office_id': _filterOffice,
+                    'type': _filterType,
+                  });
+                },
+                onOfficeChanged: (value) {
+                  setState(() {
+                    _filterOffice = value;
+                  });
+                  deviceProvider.applyFilters({
+                    'status': _filterStatus,
+                    'office_id': value,
+                    'type': _filterType,
+                  });
+                },
+                onTypeChanged: (value) {
+                  setState(() {
+                    _filterType = value;
+                  });
+                  deviceProvider.applyFilters({
+                    'status': _filterStatus,
+                    'office_id': _filterOffice,
+                    'type': value,
+                  });
+                },
+              ),
+              if (deviceProvider.total > 0)
+                Container(
                   padding: const EdgeInsets.all(16),
-                  itemCount: deviceProvider.devices.length,
-                  itemBuilder: (context, index) {
-                    final device = deviceProvider.devices[index];
-                    return DeviceCard(
-                      device: device,
-                      onEdit: () => _showDeviceDialog(device: device),
-                      onDelete: () => _deleteDevice(device['id']),
-                    );
-                  },
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total: ${deviceProvider.total}'),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left),
-                          onPressed: deviceProvider.currentPage > 1
-                              ? () => deviceProvider.previousPage()
-                              : null,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: deviceProvider.currentPage > 1
+                            ? () => deviceProvider.previousPage()
+                            : null,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chevron_left, size: 20),
+                            SizedBox(width: 4),
+                            Text('Previous'),
+                          ],
                         ),
-                        Text('${deviceProvider.currentPage} / ${deviceProvider.lastPage}'),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right),
-                          onPressed: deviceProvider.currentPage < deviceProvider.lastPage
-                              ? () => deviceProvider.nextPage()
-                              : null,
+                      ),
+                      const SizedBox(width: 16),
+                      ...List.generate(
+                        deviceProvider.lastPage,
+                        (index) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: FilledButton(
+                            onPressed: index + 1 != deviceProvider.currentPage
+                                ? () => deviceProvider.goToPage(index + 1)
+                                : null,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: index + 1 == deviceProvider.currentPage
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.surfaceVariant,
+                              foregroundColor: index + 1 == deviceProvider.currentPage
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: const Size(40, 40),
+                            ),
+                            child: Text('${index + 1}'),
+                          ),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 16),
+                      FilledButton(
+                        onPressed: deviceProvider.currentPage < deviceProvider.lastPage
+                            ? () => deviceProvider.nextPage()
+                            : null,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Next'),
+                            SizedBox(width: 4),
+                            Icon(Icons.chevron_right, size: 20),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              Expanded(
+                child: deviceProvider.devices.isEmpty
+                    ? const Center(child: Text('No devices found'))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: deviceProvider.devices.length,
+                        itemBuilder: (context, index) {
+                          final device = deviceProvider.devices[index];
+                          return DeviceCard(
+                            device: device,
+                            onEdit: () => _showDeviceDialog(device: device),
+                            onDelete: () => _deleteDevice(device['id']),
+                          );
+                        },
+                      ),
               ),
+              if (deviceProvider.total > 0)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FilledButton(
+                        onPressed: deviceProvider.currentPage > 1
+                            ? () => deviceProvider.previousPage()
+                            : null,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chevron_left, size: 20),
+                            SizedBox(width: 4),
+                            Text('Previous'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ...List.generate(
+                        deviceProvider.lastPage,
+                        (index) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: FilledButton(
+                            onPressed: index + 1 != deviceProvider.currentPage
+                                ? () => deviceProvider.goToPage(index + 1)
+                                : null,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: index + 1 == deviceProvider.currentPage
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.surfaceVariant,
+                              foregroundColor: index + 1 == deviceProvider.currentPage
+                                  ? Theme.of(context).colorScheme.onPrimary
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: const Size(40, 40),
+                            ),
+                            child: Text('${index + 1}'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      FilledButton(
+                        onPressed: deviceProvider.currentPage < deviceProvider.lastPage
+                            ? () => deviceProvider.nextPage()
+                            : null,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Next'),
+                            SizedBox(width: 4),
+                            Icon(Icons.chevron_right, size: 20),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           );
         },

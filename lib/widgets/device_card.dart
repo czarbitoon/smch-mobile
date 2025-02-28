@@ -36,13 +36,14 @@ class DeviceCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildInfoRow(Icons.category, 'Type', device['type']?.toString() ?? 'Not specified', theme),
+            _buildInfoRow(Icons.category, 'Type', device['type']?.toString() ?? 'Not specified', theme, isPlaceholder: device['type'] == null),
             const SizedBox(height: 8),
             _buildInfoRow(
               Icons.business,
               'Office',
               device['office_name']?.toString() ?? 'Not assigned',
               theme,
+              isPlaceholder: device['office_name'] == null,
             ),
             const SizedBox(height: 16),
             Row(
@@ -98,13 +99,13 @@ class DeviceCard extends StatelessWidget {
 
     return Chip(
       avatar: Icon(iconData, size: 18, color: chipColor),
+      labelStyle: TextStyle(color: chipColor, fontWeight: FontWeight.bold),
       label: Text(status),
-      labelStyle: TextStyle(color: chipColor),
       backgroundColor: chipColor.withOpacity(0.1),
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, ThemeData theme) {
+  Widget _buildInfoRow(IconData icon, String label, String value, ThemeData theme, {bool isPlaceholder = false}) {
     return Row(
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
@@ -117,7 +118,10 @@ class DeviceCard extends StatelessWidget {
         ),
         Text(
           value,
-          style: theme.textTheme.bodyLarge,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: isPlaceholder ? theme.textTheme.bodyMedium?.color?.withOpacity(0.6) : null,
+            fontStyle: isPlaceholder ? FontStyle.italic : null,
+          ),
         ),
       ],
     );

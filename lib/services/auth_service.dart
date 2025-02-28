@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'http://localhost:8000/api';
   final _storage = const FlutterSecureStorage();
 
   Future<Map<String, dynamic>?> getCurrentUser() async {

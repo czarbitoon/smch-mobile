@@ -7,9 +7,28 @@ import 'api_service.dart';
 class DeviceService {
   final ApiService _apiService = ApiService();
 
-  Future<Map<String, dynamic>> getDevices({int? page}) async {
+  Future<Map<String, dynamic>> getDevices({int? page, Map<String, dynamic>? filters}) async {
     try {
-      final response = await _apiService.get('devices${page != null ? "?page=$page" : ""}');
+      String url = 'devices';
+      Map<String, String> queryParams = {};
+      
+      if (page != null) {
+        queryParams['page'] = page.toString();
+      }
+      
+      if (filters != null && filters.isNotEmpty) {
+        filters.forEach((key, value) {
+          if (value != null && value.toString().isNotEmpty) {
+            queryParams[key] = value.toString();
+          }
+        });
+      }
+
+      if (queryParams.isNotEmpty) {
+        url += '?' + queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
+      }
+
+      final response = await _apiService.get(url);
       debugPrint('Raw API response: ${json.encode(response)}');
       
       if (response['success']) {
@@ -100,4 +119,48 @@ class DeviceService {
       return {'success': false, 'message': 'Failed to delete device: $e'};
     }
   }
-}
+
+  Future<Map<String, dynamic>> getOffices() async {
+    try {
+      debugPrint('Fetching offices');
+      final response = await _apiService.get('offices');
+      debugPrint('Get offices response: ${json.encode(response)}');
+      
+      if (response['success']) {
+        final data = response['data'];
+        debugPrint('Successfully fetched offices: ${json.encode(data)}');
+        return {'success': true, 'data': data};
+      } else {
+        final String errorMessage = response['message']?.toString() ?? 'Failed to fetch offices';
+        debugPrint('Failed to fetch offices: $errorMessage');
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in getOffices: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Failed to fetch offices: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getDeviceTypes() async {
+    try {
+      debugPrint('Fetching device types');
+      final response = await _apiService.get('device-types');
+      debugPrint('Get device types response: ${json.encode(response)}');
+      
+      if (response['success']) {
+        final data = response['data'];
+        debugPrint('Successfully fetched device types: ${json.encode(data)}');
+        return {'success': true, 'data': data};
+      } else {
+        final String errorMessage = response['message']?.toString() ?? 'Failed to fetch device types';
+        debugPrint('Failed to fetch device types: $errorMessage');
+        return {'success': false, 'message': errorMessage};
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in getDeviceTypes: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return {'success': false, 'message': 'Failed to fetch device types: $e'};
+    }
+  }
+  }

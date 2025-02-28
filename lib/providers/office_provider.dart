@@ -27,22 +27,46 @@ class OfficeProvider extends ChangeNotifier {
   }
 
   Future<void> loadOffices() async {
+    if (_isLoading) {
+      debugPrint('loadOffices: Already loading, skipping request');
+      return;
+    }
+    
+    debugPrint('loadOffices: Starting to load offices...');
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      debugPrint('loadOffices: Calling office service...');
       final result = await _officeService.getOffices();
-      if (result['success']) {
-        _offices = List<Map<String, dynamic>>.from(result['offices']);
+      debugPrint('loadOffices: Received response: $result');
+
+      if (result['success'] == true && result['offices'] != null) {
+        debugPrint('loadOffices: Successfully received offices data');
+        final officesList = List<Map<String, dynamic>>.from(result['offices']);
+        _offices = officesList.where((office) => 
+          office != null && 
+          office['id'] != null && 
+          office['name'] != null && 
+          office['name'].toString().isNotEmpty
+        ).toList();
+        debugPrint('loadOffices: Transformed ${_offices.length} valid offices');
+        debugPrint('loadOffices: Office data: ${_offices.map((o) => "${o['id']}: ${o['name']}").join(', ')}');
+        _error = null;
       } else {
-        _error = result['message'];
+        debugPrint('loadOffices: API returned error: ${result['message']}');
+        _error = result['message'] ?? 'Failed to load offices';
+        _offices = [];
       }
     } catch (e) {
-      _error = 'Failed to load offices';
+      debugPrint('loadOffices: Exception occurred: ${e.toString()}');
+      _error = 'Connection error: ${e.toString()}';
+      _offices = [];
     } finally {
       _isLoading = false;
       notifyListeners();
+      debugPrint('loadOffices: Completed loading. Success: ${_error == null}');
     }
   }
 

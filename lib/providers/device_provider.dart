@@ -26,23 +26,31 @@ class DeviceProvider extends ChangeNotifier {
     try {
       debugPrint('Starting to load devices... Page: ${page ?? _currentPage}');
       final result = await _deviceService.getDevices(page: page ?? _currentPage);
-      if (result['success']) {
+      if (result['success'] == true && result['data'] != null) {
         debugPrint('Successfully received devices data');
-        final data = result['data'];
-        _devices = (data['data'] as List).map((device) {
-          var deviceMap = Map<String, dynamic>.from(device);
-          // Ensure ID is an integer
-          deviceMap['id'] = int.tryParse(deviceMap['id'].toString()) ?? deviceMap['id'];
-          // Ensure office_id is an integer if it exists
-          if (deviceMap['office_id'] != null) {
-            deviceMap['office_id'] = int.tryParse(deviceMap['office_id'].toString()) ?? deviceMap['office_id'];
-          }
+        final data = result['data'] as Map<String, dynamic>;
+        final devicesData = data['devices'] as List? ?? [];
+        _devices = devicesData.map((device) {
+          final deviceMap = Map<String, dynamic>.from(device);
+          
+          // Unified type conversion
+          final convertField = (dynamic value) => value is int 
+              ? value 
+              : int.tryParse(value.toString()) ?? 0;
+
+          deviceMap['id'] = convertField(deviceMap['id']);
+          deviceMap['office_id'] = deviceMap['office_id'] != null 
+              ? convertField(deviceMap['office_id']) 
+              : null;
+
           return deviceMap;
-        }).toList();
-        _currentPage = data['current_page'] ?? 1;
-        _lastPage = data['last_page'] ?? 1;
-        _total = data['total'] ?? 0;
-        _perPage = data['per_page'] ?? 10;
+        }).where((d) => d['id'] != 0).toList(); // Filter invalid entries
+        
+        final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
+        _currentPage = int.tryParse(pagination['current_page']?.toString() ?? '1') ?? 1;
+        _lastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
+        _total = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
+        _perPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
         debugPrint('Number of devices loaded: ${_devices.length}');
       } else {
         debugPrint('Failed to load devices: ${result['message']}');
@@ -67,6 +75,59 @@ class DeviceProvider extends ChangeNotifier {
   Future<void> previousPage() async {
     if (_currentPage > 1) {
       await loadDevices(page: _currentPage - 1);
+    }
+  }
+
+  Future<void> goToPage(int page) async {
+    if (page >= 1 && page <= _lastPage && page != _currentPage) {
+      await loadDevices(page: page);
+    }
+  }
+
+  Future<void> applyFilters(Map<String, dynamic> filters) async {
+    _isLoading = true;
+    _currentPage = 1;
+    notifyListeners();
+
+    try {
+      debugPrint('Applying filters: $filters');
+      if (filters.containsKey('office_id') && filters['office_id'] == null) {
+        filters.remove('office_id');
+      }
+      final result = await _deviceService.getDevices(page: _currentPage, filters: filters);
+      if (result['success'] == true && result['data'] != null) {
+        final data = result['data'] as Map<String, dynamic>;
+        final devicesData = data['devices'] as List? ?? [];
+        _devices = devicesData.map((device) {
+          final deviceMap = Map<String, dynamic>.from(device);
+          
+          // Unified type conversion
+          final convertField = (dynamic value) => value is int 
+              ? value 
+              : int.tryParse(value.toString()) ?? 0;
+
+          deviceMap['id'] = convertField(deviceMap['id']);
+          deviceMap['office_id'] = deviceMap['office_id'] != null 
+              ? convertField(deviceMap['office_id']) 
+              : null;
+          return deviceMap;
+        }).where((d) => d['id'] != 0).toList(); // Filter invalid entries
+        
+        final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
+        _lastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
+        _total = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
+        _perPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
+        debugPrint('Filters applied successfully. Found ${_devices.length} devices');
+      } else {
+        debugPrint('Failed to apply filters: ${result['message']}');
+        _error = result['message'];
+      }
+    } catch (e) {
+      debugPrint('Exception while applying filters: $e');
+      _error = 'Failed to apply filters: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
