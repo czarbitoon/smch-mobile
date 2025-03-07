@@ -14,35 +14,28 @@ class ApiService {
     try {
       final token = await _storage.read(key: 'token');
       print('[ApiService] Token for request: ${token != null ? 'exists' : 'not found'}');
+      
+      if (token == null) {
+        print('[ApiService] No token found, returning unauthorized error');
+        return {
+          'success': false,
+          'message': 'Unauthorized: Please log in again',
+          'status': 401
+        };
+      }
+
       final response = await http.get(
         Uri.parse('$baseUrl/$endpoint'),
         headers: {
           ...headers,
-          if (token != null) 'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $token',
         },
       );
 
-      final Map<String, dynamic> responseData = json.decode(response.body);
-      
-      if (response.statusCode == 200) {
-        return {
-          'success': true,
-          'data': responseData['data'] ?? responseData,
-          'message': responseData['message'] ?? ''
-        };
-      } else {
-        return {
-          'success': false,
-          'data': null,
-          'message': responseData['message'] ?? 'Failed to load data: ${response.statusCode}'
-        };
-      }
+      return _handleResponse(response);
     } catch (e) {
-      return {
-        'success': false,
-        'data': null,
-        'message': 'Connection error: $e'
-      };
+      print('[ApiService] GET error: $e');
+      return {'success': false, 'message': 'Connection error'};
     }
   }
 
@@ -50,6 +43,7 @@ class ApiService {
     try {
       final token = await _storage.read(key: 'token');
       print('[ApiService] Token for request: ${token != null ? 'exists' : 'not found'}');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/$endpoint'),
         headers: {
@@ -59,26 +53,81 @@ class ApiService {
         body: json.encode(data),
       );
 
+      return _handleResponse(response);
+    } catch (e) {
+      print('[ApiService] POST error: $e');
+      return {'success': false, 'message': 'Connection error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> put(String endpoint, dynamic body) async {
+    try {
+      final token = await _storage.read(key: 'token');
+      final response = await http.put(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: {
+          ...headers,
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(body),
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[ApiService] PUT error: $e');
+      return {'success': false, 'message': 'Connection error'};
+    }
+  }
+
+  Future<Map<String, dynamic>> delete(String endpoint) async {
+    try {
+      final token = await _storage.read(key: 'token');
+      final response = await http.delete(
+        Uri.parse('$baseUrl/$endpoint'),
+        headers: {
+          ...headers,
+          'Authorization': 'Bearer $token',
+        },
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      print('[ApiService] DELETE error: $e');
+      return {'success': false, 'message': 'Connection error'};
+    }
+  }
+
+  Map<String, dynamic> _handleResponse(http.Response response) {
+    try {
       final Map<String, dynamic> responseData = json.decode(response.body);
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 401) {
+        print('[ApiService] Received 401 unauthorized response');
+        _storage.deleteAll(); // Clear stored credentials
+        return {
+          'success': false,
+          'message': 'Session expired: Please log in again',
+          'status': 401
+        };
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
         return {
           'success': true,
           'data': responseData['data'] ?? responseData,
           'message': responseData['message'] ?? ''
         };
-      } else {
-        return {
-          'success': false,
-          'data': null,
-          'message': responseData['message'] ?? 'Request failed: ${response.statusCode}'
-        };
       }
-    } catch (e) {
+
       return {
         'success': false,
-        'data': null,
-        'message': 'Connection error: $e'
+        'message': responseData['message'] ?? 'Request failed with status ${response.statusCode}',
+        'status': response.statusCode
+      };
+    } catch (e) {
+      print('[ApiService] Error handling response: $e');
+      return {
+        'success': false,
+        'message': 'Failed to process response',
+        'status': response.statusCode
       };
     }
   }

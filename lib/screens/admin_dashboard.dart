@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'device_management_screen.dart';
 import 'office_management_screen.dart';
+import 'reports_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -79,6 +80,19 @@ class AdminDashboard extends StatelessWidget {
                 );
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('Reports'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -124,6 +138,26 @@ class AdminDashboard extends StatelessWidget {
                   Icon(Icons.business, size: 48.0),
                   SizedBox(height: 16.0),
                   Text('Office Management'),
+                ],
+              ),
+            ),
+          ),
+          Card(
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
+                  ),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.description, size: 48.0),
+                  SizedBox(height: 16.0),
+                  Text('Reports'),
                 ],
               ),
             ),

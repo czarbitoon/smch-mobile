@@ -8,12 +8,14 @@ class ReportProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = false;
   String? _error;
+  int _unreadCount = 0;
 
   List<Map<String, dynamic>> get deviceReports => _deviceReports;
   List<Map<String, dynamic>> get officeReports => _officeReports;
   List<Map<String, dynamic>> get notifications => _notifications;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  int get unreadCount => _unreadCount;
 
   Future<void> loadDeviceReports() async {
     _isLoading = true;
@@ -64,6 +66,7 @@ class ReportProvider extends ChangeNotifier {
       final result = await _reportService.getNotifications();
       if (result['success']) {
         _notifications = List<Map<String, dynamic>>.from(result['notifications']);
+        _updateUnreadCount();
       } else {
         _error = result['message'];
       }
@@ -82,6 +85,7 @@ class ReportProvider extends ChangeNotifier {
         final index = _notifications.indexWhere((notification) => notification['id'] == id);
         if (index != -1) {
           _notifications[index]['read'] = true;
+          _updateUnreadCount();
           notifyListeners();
         }
         return true;
@@ -124,6 +128,12 @@ class ReportProvider extends ChangeNotifier {
 
   set notifications(List<Map<String, dynamic>> value) {
     _notifications = value;
+    _updateUnreadCount();
+    notifyListeners();
+  }
+
+  void _updateUnreadCount() {
+    _unreadCount = _notifications.where((notification) => !(notification['read'] ?? false)).length;
     notifyListeners();
   }
 }

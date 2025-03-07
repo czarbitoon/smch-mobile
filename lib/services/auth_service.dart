@@ -9,6 +9,11 @@ class AuthService {
   Future<Map<String, dynamic>?> getCurrentUser() async {
     print('[AuthService] Getting current user');
     try {
+      final token = await _storage.read(key: 'token');
+      if (token == null) {
+        print('[AuthService] No token found');
+        return null;
+      }
       final userStr = await _storage.read(key: 'user');
       print('[AuthService] Stored user data found: ${userStr != null}');
       if (userStr != null) {

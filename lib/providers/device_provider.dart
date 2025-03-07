@@ -4,6 +4,7 @@ import '../services/device_service.dart';
 class DeviceProvider extends ChangeNotifier {
   final DeviceService _deviceService = DeviceService();
   List<Map<String, dynamic>> _devices = [];
+  List<Map<String, dynamic>> _deviceTypes = [];
   bool _isLoading = false;
   String? _error;
   int _currentPage = 1;
@@ -12,6 +13,7 @@ class DeviceProvider extends ChangeNotifier {
   int _total = 0;
 
   List<Map<String, dynamic>> get devices => _devices;
+  List<Map<String, dynamic>> get deviceTypes => _deviceTypes;
   bool get isLoading => _isLoading;
   String? get error => _error;
   int get currentPage => _currentPage;
@@ -24,10 +26,15 @@ class DeviceProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('Starting to load devices... Page: ${page ?? _currentPage}');
       final result = await _deviceService.getDevices(page: page ?? _currentPage);
+      
+      if (result['status'] == 401) {
+        _error = result['message'];
+        _devices = [];
+        return;
+      }
+
       if (result['success'] == true && result['data'] != null) {
-        debugPrint('Successfully received devices data');
         final data = result['data'] as Map<String, dynamic>;
         final devicesData = data['devices'] as List? ?? [];
         _devices = devicesData.map((device) {
@@ -42,6 +49,14 @@ class DeviceProvider extends ChangeNotifier {
           deviceMap['office_id'] = deviceMap['office_id'] != null 
               ? convertField(deviceMap['office_id']) 
               : null;
+          deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
+          deviceMap['type'] = deviceMap['type']?['name'] ?? deviceMap['device_subcategory']?['device_type']?['name'] ?? 'Unknown';
+          deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
+              ? convertField(deviceMap['subcategory_id'])
+              : null;
+          deviceMap['type_id'] = deviceMap['device_subcategory']?['device_type']?['id'] != null
+              ? convertField(deviceMap['device_subcategory']['device_type']['id'])
+              : null;
 
           return deviceMap;
         }).where((d) => d['id'] != 0).toList(); // Filter invalid entries
@@ -51,18 +66,38 @@ class DeviceProvider extends ChangeNotifier {
         _lastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
         _total = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
         _perPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
-        debugPrint('Number of devices loaded: ${_devices.length}');
+
       } else {
-        debugPrint('Failed to load devices: ${result['message']}');
+
         _error = result['message'];
       }
     } catch (e) {
-      debugPrint('Exception while loading devices: $e');
+
       _error = 'Failed to load devices: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
-      debugPrint('Device loading process completed. Error: $_error');
+
+    }
+  }
+
+  Future<void> loadDeviceTypes() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final result = await _deviceService.getDeviceTypes();
+      if (result['success'] == true && result['data'] != null) {
+        _deviceTypes = List<Map<String, dynamic>>.from(result['data']);
+      } else {
+        _error = result['message'];
+      }
+    } catch (e) {
+      _error = 'Failed to load device types: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -90,7 +125,6 @@ class DeviceProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('Applying filters: $filters');
       if (filters.containsKey('office_id') && filters['office_id'] == null) {
         filters.remove('office_id');
       }
@@ -110,6 +144,19 @@ class DeviceProvider extends ChangeNotifier {
           deviceMap['office_id'] = deviceMap['office_id'] != null 
               ? convertField(deviceMap['office_id']) 
               : null;
+          deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
+          deviceMap['type'] = deviceMap['type']?['name'] ?? deviceMap['device_subcategory']?['device_type']?['name'] ?? 'Unknown';
+          deviceMap['type_id'] = deviceMap['type']?['id'] != null
+              ? convertField(deviceMap['type']['id'])
+              : deviceMap['device_subcategory']?['device_type']?['id'] != null
+                  ? convertField(deviceMap['device_subcategory']['device_type']['id'])
+                  : null;
+          
+          // Ensure type_id is always an integer or null
+          if (deviceMap['type_id'] != null) {
+            deviceMap['type_id'] = int.tryParse(deviceMap['type_id'].toString()) ?? null;
+          }
+
           return deviceMap;
         }).where((d) => d['id'] != 0).toList(); // Filter invalid entries
         
@@ -117,13 +164,13 @@ class DeviceProvider extends ChangeNotifier {
         _lastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
         _total = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
         _perPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
-        debugPrint('Filters applied successfully. Found ${_devices.length} devices');
+        debugPrint('Type filter applied - Type: ${filters['type_id']}, Filtered devices count: ${_devices.length}');
       } else {
-        debugPrint('Failed to apply filters: ${result['message']}');
+
         _error = result['message'];
       }
     } catch (e) {
-      debugPrint('Exception while applying filters: $e');
+
       _error = 'Failed to apply filters: $e';
     } finally {
       _isLoading = false;

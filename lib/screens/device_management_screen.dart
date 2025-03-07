@@ -238,10 +238,74 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                         itemCount: deviceProvider.devices.length,
                         itemBuilder: (context, index) {
                           final device = deviceProvider.devices[index];
-                          return DeviceCard(
-                            device: device,
-                            onEdit: () => _showDeviceDialog(device: device),
-                            onDelete: () => _deleteDevice(device['id']),
+                          return Card(
+                            elevation: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          device['name'] ?? 'Unknown Device',
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      PopupMenuButton<String>(
+                                        onSelected: (value) {
+                                          if (value == 'edit') {
+                                            _showDeviceDialog(device: device);
+                                          } else if (value == 'delete') {
+                                            _deleteDevice(device['id']);
+                                          }
+                                        },
+                                        itemBuilder: (context) => [
+                                          const PopupMenuItem(
+                                            value: 'edit',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.edit),
+                                                SizedBox(width: 8),
+                                                Text('Edit'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'delete',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.delete),
+                                                SizedBox(width: 8),
+                                                Text('Delete'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Type: ${device['type'] ?? 'Unknown'}',
+                                    style: Theme.of(context).textTheme.bodyLarge,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Status: ${device['status'] ?? 'Unknown'}',
+                                    style: Theme.of(context).textTheme.bodyLarge,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Office: ${device['office'] ?? 'Unassigned'}',
+                                    style: Theme.of(context).textTheme.bodyLarge,
+                                  ),
+                                ],
+                              ),
+                            ),
                           );
                         },
                       ),

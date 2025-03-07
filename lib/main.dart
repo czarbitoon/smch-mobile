@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/auth_provider.dart';
 import 'providers/office_provider.dart';
 import 'providers/device_provider.dart';
+import 'providers/device_report_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/staff_dashboard.dart';
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => OfficeProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProvider(create: (_) => DeviceReportProvider()),
       ],
       child: MaterialApp(
         title: 'SMCH Mobile',

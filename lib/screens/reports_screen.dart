@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/report_provider.dart';
+import '../providers/reports_provider.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -9,24 +9,16 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ReportsScreenState extends State<ReportsScreen> {
+  String _selectedReportType = 'All';
+  final List<String> _reportTypes = ['All', 'Daily', 'Weekly', 'Monthly'];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     Future.microtask(() {
-      final reportProvider = context.read<ReportProvider>();
-      reportProvider.loadDeviceReports();
-      reportProvider.loadOfficeReports();
+      context.read<ReportsProvider>().loadReports();
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
@@ -34,109 +26,156 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Device Reports'),
-            Tab(text: 'Office Reports'),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          DeviceReportsTab(),
-          OfficeReportsTab(),
-        ],
-      ),
-    );
-  }
-}
+      body: Consumer<ReportsProvider>(
+        builder: (context, reportsProvider, child) {
+          if (reportsProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-class DeviceReportsTab extends StatelessWidget {
-  const DeviceReportsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<ReportProvider>(
-      builder: (context, reportProvider, child) {
-        if (reportProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (reportProvider.error != null) {
-          return Center(child: Text(reportProvider.error!));
-        }
-
-        if (reportProvider.deviceReports.isEmpty) {
-          return const Center(child: Text('No device reports found'));
-        }
-
-        return ListView.builder(
-          itemCount: reportProvider.deviceReports.length,
-          itemBuilder: (context, index) {
-            final report = reportProvider.deviceReports[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                title: Text(report['device_name']),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Status: ${report["status"]}'),
-                    Text('Last Updated: ${report["updated_at"]}'),
-                    Text('Description: ${report["description"]}'),
-                  ],
-                ),
+          if (reportsProvider.error != null) {
+            return Center(
+              child: Text(
+                'Error: ${reportsProvider.error}',
+                style: const TextStyle(color: Colors.red),
               ),
             );
-          },
-        );
-      },
-    );
-  }
-}
+          }
 
-class OfficeReportsTab extends StatelessWidget {
-  const OfficeReportsTab({super.key});
+          final filteredReports = _selectedReportType == 'All'
+              ? reportsProvider.reports
+              : reportsProvider.reports
+                  .where((report) =>
+                      report['type']?.toString().toLowerCase() ==
+                      _selectedReportType.toLowerCase())
+                  .toList();
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<ReportProvider>(
-      builder: (context, reportProvider, child) {
-        if (reportProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (reportProvider.error != null) {
-          return Center(child: Text(reportProvider.error!));
-        }
-
-        if (reportProvider.officeReports.isEmpty) {
-          return const Center(child: Text('No office reports found'));
-        }
-
-        return ListView.builder(
-          itemCount: reportProvider.officeReports.length,
-          itemBuilder: (context, index) {
-            final report = reportProvider.officeReports[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                title: Text(report['office_name']),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Activity: ${report["activity"]}'),
-                    Text('Date: ${report["date"]}'),
-                    Text('Details: ${report["details"]}'),
-                  ],
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedReportType,
+                  decoration: const InputDecoration(
+                    labelText: 'Report Type',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _reportTypes.map((String type) {
+                    return DropdownMenuItem<String>(
+                      value: type,
+                      child: Text(type),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedReportType = newValue;
+                      });
+                    }
+                  },
                 ),
               ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredReports.length,
+                  padding: const EdgeInsets.all(16.0),
+                  itemBuilder: (context, index) {
+                    final report = filteredReports[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16.0),
+                      child: ListTile(
+                        title: Text('Report #${report['id']}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Type: ${report['type'] ?? 'N/A'}'),
+                            Text('Generated: ${report['created_at'] ?? 'N/A'}'),
+                            Text('Status: ${report['status'] ?? 'N/A'}'),
+                          ],
+                        ),
+                        onTap: () async {
+                          try {
+                            final details = await reportsProvider
+                                .getReportDetails(report['id']);
+                            if (!mounted) return;
+                            
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text('Report #${report['id']} Details'),
+                                content: SingleChildScrollView(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text('Type: ${details['type'] ?? 'N/A'}'),
+                                      Text('Status: ${details['status'] ?? 'N/A'}'),
+                                      Text('Generated: ${details['created_at'] ?? 'N/A'}'),
+                                      const SizedBox(height: 8),
+                                      const Text('Summary:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      Text(details['summary'] ?? 'No summary available'),
+                                      const SizedBox(height: 8),
+                                      const Text('Devices:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ...(details['devices'] as List<dynamic>? ?? [])
+                                          .map((device) => Padding(
+                                                padding: const EdgeInsets.only(left: 8.0),
+                                                child: Text('- ${device['name']} (${device['status']})'),
+                                              ))
+                                          .toList(),
+                                    ],
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Close'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error loading report details: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          try {
+            await context.read<ReportsProvider>().generateReport();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Report generated successfully'),
+                backgroundColor: Colors.green,
+              ),
             );
-          },
-        );
-      },
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error generating report: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

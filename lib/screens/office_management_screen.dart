@@ -12,11 +12,6 @@ class OfficeManagementScreen extends StatefulWidget {
 class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _managerController = TextEditingController();
-  String? _selectedStatus;
-
-  final List<String> _statusOptions = ['Active', 'Inactive', 'Under Maintenance'];
 
   @override
   void initState() {
@@ -29,8 +24,6 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _locationController.dispose();
-    _managerController.dispose();
     super.dispose();
   }
 
@@ -48,56 +41,170 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
       ),
       body: Consumer<OfficeProvider>(
         builder: (context, officeProvider, child) {
-          if (officeProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+           if (officeProvider.isLoading) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            );
           }
 
           if (officeProvider.error != null) {
-            return Center(child: Text(officeProvider.error!));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    officeProvider.error!,
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
           if (officeProvider.offices.isEmpty) {
-            return const Center(child: Text('No offices found'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.business_outlined,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No offices found',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Add an office to get started',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            );
           }
 
-          return ListView.builder(
-            itemCount: officeProvider.offices.length,
-            itemBuilder: (context, index) {
-              final office = officeProvider.offices[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  title: Text(office['name']),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Location: ${office["location"]}'),
-                      Text('Manager: ${office["manager"]}'),
-                      Text('Status: ${office["status"]}'),
-                    ],
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 16.0,
+                mainAxisSpacing: 16.0,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: officeProvider.offices.length,
+              itemBuilder: (context, index) {
+                final office = officeProvider.offices[index];
+                return Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      width: 1,
+                    ),
                   ),
-                  trailing: PopupMenuButton(
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit'),
+                  child: InkWell(
+                    onTap: () => _showOfficeDialog(office: office),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.business,
+                            color: Theme.of(context).colorScheme.primary,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            office['name'],
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const Spacer(),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Tap to edit',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.more_vert,
+                                  size: 20,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    builder: (context) => Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ListTile(
+                                          leading: const Icon(Icons.edit),
+                                          title: const Text('Edit'),
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            _showOfficeDialog(office: office);
+                                          },
+                                        ),
+                                        ListTile(
+                                          leading: Icon(
+                                            Icons.delete,
+                                            color: Theme.of(context).colorScheme.error,
+                                          ),
+                                          title: Text(
+                                            'Delete',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.error,
+                                            ),
+                                          ),
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            _showDeleteConfirmation(office);
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
-                      ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _showOfficeDialog(office: office);
-                      } else if (value == 'delete') {
-                        _showDeleteConfirmation(office);
-                      }
-                    },
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),
@@ -109,20 +216,17 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
     
     if (isEditing) {
       _nameController.text = office['name'];
-      _locationController.text = office['location'];
-      _managerController.text = office['manager'];
-      _selectedStatus = office['status'];
     } else {
       _nameController.clear();
-      _locationController.clear();
-      _managerController.clear();
-      _selectedStatus = _statusOptions.first;
     }
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isEditing ? 'Edit Office' : 'Add Office'),
+        title: Text(
+          isEditing ? 'Edit Office' : 'Add Office',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         content: SingleChildScrollView(
           child: Form(
             key: _formKey,
@@ -131,38 +235,38 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
               children: [
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    hintText: 'Enter office name',
+                    prefixIcon: Icon(
+                      Icons.business,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
                   validator: (value) =>
                       value?.isEmpty ?? true ? 'Please enter a name' : null,
-                ),
-                TextFormField(
-                  controller: _locationController,
-                  decoration: const InputDecoration(labelText: 'Location'),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Please enter a location' : null,
-                ),
-                TextFormField(
-                  controller: _managerController,
-                  decoration: const InputDecoration(labelText: 'Manager'),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Please enter a manager name' : null,
-                ),
-                DropdownButtonFormField<String>(
-                  value: _selectedStatus,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: _statusOptions.map((status) {
-                    return DropdownMenuItem(
-                      value: status,
-                      child: Text(status),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedStatus = value;
-                    });
-                  },
-                  validator: (value) =>
-                      value == null ? 'Please select a status' : null,
                 ),
               ],
             ),
@@ -171,16 +275,16 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.secondary,
+            ),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () async {
               if (_formKey.currentState?.validate() ?? false) {
                 final officeData = {
                   'name': _nameController.text,
-                  'location': _locationController.text,
-                  'manager': _managerController.text,
-                  'status': _selectedStatus,
                 };
 
                 final success = isEditing
@@ -215,14 +319,35 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Office'),
-        content: Text('Are you sure you want to delete ${office['name']}?'),
+        title: Text(
+          'Delete Office',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Are you sure you want to delete ${office['name']}?',
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.secondary,
+            ),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () async {
               final success = await context
                   .read<OfficeProvider>()

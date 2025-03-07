@@ -30,12 +30,24 @@ class OfficeService {
           return {'success': false, 'message': 'Invalid server response format', 'error_type': 'data_format'};
         }
 
-        if (!data['data'].containsKey('offices') || data['data']['offices'] == null) {
-          print('[OfficeService] Invalid response format: missing offices array');
+        var offices;
+        if (data['success'] == true && data['data']?['offices'] != null) {
+          // Handle the specific response structure where offices are under data.offices
+          print('[OfficeService] Using offices data from data.offices');
+          offices = data['data']['offices'];
+        } else if (data['data']?['data'] != null) {
+          // Handle paginated response
+          print('[OfficeService] Using paginated data');
+          offices = data['data']['data'];
+        } else if (data['data'] is List) {
+          // Handle direct array response
+          print('[OfficeService] Using direct array');
+          offices = data['data'];
+        } else {
+          print('[OfficeService] Invalid response format: no valid offices data found');
           return {'success': false, 'message': 'Invalid office data format', 'error_type': 'offices_format'};
         }
 
-        final offices = data['data']['offices'];
         if (offices is! List) {
           print('[OfficeService] Invalid response format: offices is not an array');
           return {'success': false, 'message': 'Invalid office data type', 'error_type': 'offices_type'};
