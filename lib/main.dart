@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/api_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/office_provider.dart';
 import 'providers/device_provider.dart';
 import 'providers/device_report_provider.dart';
+import 'providers/reports_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/staff_dashboard.dart';
@@ -28,6 +30,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => OfficeProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
         ChangeNotifierProvider(create: (_) => DeviceReportProvider()),
+        ChangeNotifierProvider(create: (_) => ReportsProvider(ApiService())),
       ],
       child: MaterialApp(
         title: 'SMCH Mobile',

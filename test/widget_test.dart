@@ -20,6 +20,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => OfficeProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProvider(create: (_) => ReportProvider()),
       ],
       child: const MyApp(),
     ));

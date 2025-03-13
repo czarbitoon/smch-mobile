@@ -11,6 +11,7 @@ class ReportProvider extends ChangeNotifier {
   int _unreadCount = 0;
 
   List<Map<String, dynamic>> get deviceReports => _deviceReports;
+  List<Map<String, dynamic>> get devices => _devices;
   List<Map<String, dynamic>> get officeReports => _officeReports;
   List<Map<String, dynamic>> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -23,11 +24,24 @@ class ReportProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _reportService.getDeviceReports();
-      if (result['success']) {
-        _deviceReports = List<Map<String, dynamic>>.from(result['reports']);
+      final devicesResult = await DeviceService().getDevices();
+      final reportsResult = await _reportService.getDeviceReports();
+      
+      if (devicesResult['success'] && reportsResult['success']) {
+        // Transform device data similar to DeviceProvider
+        final convertField = (value) => value is int ? value : int.tryParse(value.toString()) ?? 0;
+        
+        _devices = List<Map<String,dynamic>>.from(devicesResult['data']['devices'])
+          .map((d) => {
+            'id': convertField(d['id']),
+            'name': d['name'] ?? 'Unnamed Device',
+            'type': d['device_subcategory']?['device_type']?['name'] ?? 'Unknown'
+          }).toList();
+        
+        _deviceReports = List<Map<String, dynamic>>.from(reportsResult['reports']);
+        notifyListeners();
       } else {
-        _error = result['message'];
+        _error = reportsResult['message'] ?? 'Failed to load reports';
       }
     } catch (e) {
       _error = 'Failed to load device reports';
@@ -47,7 +61,7 @@ class ReportProvider extends ChangeNotifier {
       if (result['success']) {
         _officeReports = List<Map<String, dynamic>>.from(result['reports']);
       } else {
-        _error = result['message'];
+        _error = reportsResult['message'] ?? 'Failed to load reports';
       }
     } catch (e) {
       _error = 'Failed to load office reports';
@@ -68,7 +82,7 @@ class ReportProvider extends ChangeNotifier {
         _notifications = List<Map<String, dynamic>>.from(result['notifications']);
         _updateUnreadCount();
       } else {
-        _error = result['message'];
+        _error = reportsResult['message'] ?? 'Failed to load reports';
       }
     } catch (e) {
       _error = 'Failed to load notifications';
@@ -90,7 +104,7 @@ class ReportProvider extends ChangeNotifier {
         }
         return true;
       } else {
-        _error = result['message'];
+        _error = reportsResult['message'] ?? 'Failed to load reports';
         return false;
       }
     } catch (e) {
@@ -107,7 +121,7 @@ class ReportProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = result['message'];
+        _error = reportsResult['message'] ?? 'Failed to load reports';
         return false;
       }
     } catch (e) {

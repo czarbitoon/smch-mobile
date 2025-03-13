@@ -4,6 +4,7 @@ import '../providers/device_provider.dart';
 import '../providers/office_provider.dart';
 import '../widgets/device_filters.dart';
 import '../widgets/device_card.dart';
+import '../widgets/common/state_widgets.dart';
 
 class DeviceManagementScreen extends StatefulWidget {
   const DeviceManagementScreen({super.key});
@@ -115,11 +116,11 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
       body: Consumer2<DeviceProvider, OfficeProvider>(
         builder: (context, deviceProvider, officeProvider, child) {
           if (deviceProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingWidget();
           }
 
           if (deviceProvider.error != null) {
-            return Center(child: Text(deviceProvider.error!));
+            return ErrorStateWidget(message: deviceProvider.error!);
           }
 
           return Column(

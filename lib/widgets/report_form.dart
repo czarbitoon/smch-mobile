@@ -13,7 +13,12 @@ class _ReportFormState extends State<ReportForm> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   String? _selectedDeviceId;
+  String _selectedPriority = 'Medium';
+  String _selectedStatus = 'Pending';
   bool _isLoading = false;
+
+  final List<String> _priorityLevels = ReportsProvider.priorityLevels;
+  final List<String> _statusOptions = ReportsProvider.statusOptions;
 
   @override
   void dispose() {
@@ -88,6 +93,44 @@ class _ReportFormState extends State<ReportForm> {
                       return 'Please select a device';
                     }
                     return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedPriority,
+                  decoration: const InputDecoration(
+                    labelText: 'Priority Level',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _priorityLevels.map((String priority) {
+                    return DropdownMenuItem<String>(
+                      value: priority,
+                      child: Text(priority),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() => _selectedPriority = newValue);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _selectedStatus,
+                  decoration: const InputDecoration(
+                    labelText: 'Status',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _statusOptions.map((String status) {
+                    return DropdownMenuItem<String>(
+                      value: status,
+                      child: Text(status),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() => _selectedStatus = newValue);
+                    }
                   },
                 ),
                 const SizedBox(height: 16),

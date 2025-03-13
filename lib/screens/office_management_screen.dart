@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/office_provider.dart';
+import '../widgets/common/state_widgets.dart';
 
 class OfficeManagementScreen extends StatefulWidget {
   const OfficeManagementScreen({super.key});
@@ -42,58 +43,18 @@ class _OfficeManagementScreenState extends State<OfficeManagementScreen> {
       body: Consumer<OfficeProvider>(
         builder: (context, officeProvider, child) {
            if (officeProvider.isLoading) {
-            return Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            );
+            return const LoadingWidget();
           }
 
           if (officeProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    officeProvider.error!,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
+            return ErrorStateWidget(message: officeProvider.error!);
           }
 
           if (officeProvider.offices.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.business_outlined,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No offices found',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add an office to get started',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
-              ),
+            return const EmptyStateWidget(
+              icon: Icons.business_outlined,
+              title: 'No offices found',
+              subtitle: 'Add an office to get started',
             );
           }
 

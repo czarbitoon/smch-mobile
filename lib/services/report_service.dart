@@ -10,7 +10,7 @@ class ReportService {
     try {
       final token = await _authService.getToken();
       final response = await http.get(
-        Uri.parse('$baseUrl/reports/devices'),
+        Uri.parse('$baseUrl/reports'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -33,7 +33,7 @@ class ReportService {
     try {
       final token = await _authService.getToken();
       final response = await http.get(
-        Uri.parse('$baseUrl/reports/offices'),
+        Uri.parse('$baseUrl/reports'),
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
@@ -78,7 +78,7 @@ class ReportService {
   Future<Map<String, dynamic>> markNotificationAsRead(int id) async {
     try {
       final token = await _authService.getToken();
-      final response = await http.put(
+      final response = await http.post(
         Uri.parse('$baseUrl/notifications/$id/read'),
         headers: {
           'Authorization': 'Bearer $token',
