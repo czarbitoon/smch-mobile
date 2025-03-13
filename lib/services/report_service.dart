@@ -1,121 +1,99 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'auth_service.dart';
+import 'package:flutter/foundation.dart';
+import 'api_service.dart';
 
 class ReportService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
-  final AuthService _authService = AuthService();
+  final ApiService _apiService = ApiService();
 
-  Future<Map<String, dynamic>> getDeviceReports() async {
+  Future<Map<String, dynamic>> getReports({int? page, Map<String, dynamic>? filters}) async {
     try {
-      final token = await _authService.getToken();
-      final response = await http.get(
-        Uri.parse('$baseUrl/reports'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'reports': data['reports']};
-      } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
+      final queryParams = <String, String>{};
+      
+      if (page != null) queryParams['page'] = page.toString();
+      if (filters != null) {
+        filters.forEach((key, value) {
+          if (value != null && value.toString().isNotEmpty) {
+            queryParams[key] = value.toString();
+          }
+        });
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+
+      final response = await _apiService.get('reports', queryParams: queryParams);
+      return _processResponse(response);
+    } catch (e, stackTrace) {
+      return _handleError(e, stackTrace, 'Failed to fetch reports');
     }
   }
 
-  Future<Map<String, dynamic>> getOfficeReports() async {
-    try {
-      final token = await _authService.getToken();
-      final response = await http.get(
-        Uri.parse('$baseUrl/reports'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'reports': data['reports']};
-      } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
-    }
+  Future<Map<String, dynamic>> createReport(Map<String, dynamic> reportData) async {
+    return _handleApiCall(() => _apiService.post('reports', reportData), 'create report');
   }
 
-  Future<Map<String, dynamic>> getNotifications() async {
-    try {
-      final token = await _authService.getToken();
-      final response = await http.get(
-        Uri.parse('$baseUrl/notifications'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
+  Future<Map<String, dynamic>> updateReport(int id, Map<String, dynamic> reportData) async {
+    return _handleApiCall(() => _apiService.put('reports/$id', reportData), 'update report');
+  }
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'notifications': data['notifications']};
-      } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+  Future<Map<String, dynamic>> deleteReport(int id) async {
+    return _handleApiCall(() => _apiService.delete('reports/$id'), 'delete report');
+  }
+
+  Future<Map<String, dynamic>> getNotifications({int? page}) async {
+    try {
+      final queryParams = page != null ? {'page': page.toString()} : null;
+      final response = await _apiService.get('notifications', queryParams: queryParams);
+      return _processResponse(response);
+    } catch (e, stackTrace) {
+      return _handleError(e, stackTrace, 'Failed to fetch notifications');
     }
   }
 
   Future<Map<String, dynamic>> markNotificationAsRead(int id) async {
-    try {
-      final token = await _authService.getToken();
-      final response = await http.post(
-        Uri.parse('$baseUrl/notifications/$id/read'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true};
-      } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
-    }
+    return _handleApiCall(
+      () => _apiService.post('notifications/$id/read', {}),
+      'mark notification as read'
+    );
   }
 
   Future<Map<String, dynamic>> clearAllNotifications() async {
-    try {
-      final token = await _authService.getToken();
-      final response = await http.delete(
-        Uri.parse('$baseUrl/notifications/clear'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
+    return _handleApiCall(
+      () => _apiService.post('notifications/clear', {}),
+      'clear all notifications'
+    );
+  }
 
-      if (response.statusCode == 200) {
-        return {'success': true};
-      } else {
-        final error = json.decode(response.body);
-        return {'success': false, 'message': error['message']};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error'};
+  Future<Map<String, dynamic>> _handleApiCall(
+    Future<Map<String, dynamic>> Function() apiCall,
+    String action
+  ) async {
+    try {
+      final response = await apiCall();
+      return _processResponse(response);
+    } catch (e, stackTrace) {
+      return _handleError(e, stackTrace, 'Failed to $action');
     }
+  }
+
+  Map<String, dynamic> _processResponse(Map<String, dynamic> response) {
+    return response;
+  }
+
+  Map<String, dynamic> _handleError(dynamic error, StackTrace stackTrace, String message) {
+    String errorMessage = message;
+    Map<String, dynamic> errorDetails = {};
+
+    if (error is Map<String, dynamic>) {
+      if (error['status'] == 422) {
+        errorMessage = 'Validation failed';
+        errorDetails = error['errors'] ?? {};
+        debugPrint('Validation Error: ${error['message']}\nDetails: $errorDetails');
+      }
+    }
+
+    debugPrint('$errorMessage: $error\n$stackTrace');
+    return {
+      'success': false,
+      'message': errorMessage,
+      'error': error.toString(),
+      'details': errorDetails
+    };
   }
 }

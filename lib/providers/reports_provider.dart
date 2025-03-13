@@ -87,7 +87,7 @@ class ReportsProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> submitDeviceReport(int deviceId, String description) async {
+  Future<bool> submitDeviceReport(int deviceId, String description, {String priority = 'Medium', String status = 'Pending'}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -96,6 +96,8 @@ class ReportsProvider extends ChangeNotifier {
       await _apiService.post('/reports', {
         'device_id': deviceId,
         'description': description,
+        'priority': priority,
+        'status': status,
       });
       await loadReports();
       return true;

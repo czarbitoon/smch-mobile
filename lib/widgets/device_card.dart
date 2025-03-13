@@ -96,8 +96,10 @@ class DeviceCard extends StatelessWidget {
                                 ? null
                                 : () async {
                                     final success = await reportProvider.submitReport(
-                                      device['id'],
-                                      descriptionController.text,
+                                      deviceId: device['id'],
+                                      description: descriptionController.text,
+                                      priority: 'Medium',
+                                      status: 'Pending',
                                     );
                                     if (success) {
                                       Navigator.pop(context);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/reports_provider.dart';
+import '../providers/device_report_provider.dart';
 
 class DeviceReportScreen extends StatefulWidget {
   final int deviceId;
@@ -23,8 +23,8 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
   String _selectedStatus = 'Pending';
   bool _isSubmitting = false;
 
-  final List<String> _priorityLevels = ['Low', 'Medium', 'High', 'Critical'];
-  final List<String> _statusOptions = ['Pending', 'In Progress', 'Resolved', 'Closed'];
+  final List<String> _priorityLevels = DeviceReportProvider.priorityLevels;
+  final List<String> _statusOptions = DeviceReportProvider.statusOptions;
 
   @override
   void dispose() {
@@ -38,10 +38,10 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final reportsProvider = context.read<ReportsProvider>();
-      final success = await reportsProvider.submitDeviceReport(
-        widget.deviceId,
-        _descriptionController.text,
+      final reportProvider = context.read<DeviceReportProvider>();
+      final success = await reportProvider.submitReport(
+        deviceId: widget.deviceId.toString(),
+        description: _descriptionController.text,
         priority: _selectedPriority,
         status: _selectedStatus,
       );
@@ -55,7 +55,7 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
         Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(reportsProvider.error ?? 'Failed to submit report')),
+          SnackBar(content: Text(reportProvider.error ?? 'Failed to submit report')),
         );
       }
     } finally {

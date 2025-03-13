@@ -1,153 +1,138 @@
 import 'package:flutter/material.dart';
 import '../services/report_service.dart';
+import 'base_provider.dart';
 
-class ReportProvider extends ChangeNotifier {
+class ReportProvider extends BaseProvider {
   final ReportService _reportService = ReportService();
-  List<Map<String, dynamic>> _deviceReports = [];
-  List<Map<String, dynamic>> _officeReports = [];
+  List<Map<String, dynamic>> _reports = [];
   List<Map<String, dynamic>> _notifications = [];
-  bool _isLoading = false;
-  String? _error;
-  int _unreadCount = 0;
+  int _currentPage = 1;
+  bool _hasMoreData = true;
+  Map<String, dynamic> _filters = {};
 
-  List<Map<String, dynamic>> get deviceReports => _deviceReports;
-  List<Map<String, dynamic>> get devices => _devices;
-  List<Map<String, dynamic>> get officeReports => _officeReports;
+  List<Map<String, dynamic>> get reports => _reports;
   List<Map<String, dynamic>> get notifications => _notifications;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-  int get unreadCount => _unreadCount;
+  bool get hasMoreData => _hasMoreData;
+  Map<String, dynamic> get filters => _filters;
 
-  Future<void> loadDeviceReports() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> loadReports({bool refresh = false}) async {
+    if (refresh) {
+      _currentPage = 1;
+      _reports = [];
+      _hasMoreData = true;
+    }
 
-    try {
-      final devicesResult = await DeviceService().getDevices();
-      final reportsResult = await _reportService.getDeviceReports();
-      
-      if (devicesResult['success'] && reportsResult['success']) {
-        // Transform device data similar to DeviceProvider
-        final convertField = (value) => value is int ? value : int.tryParse(value.toString()) ?? 0;
+    if (!_hasMoreData) return;
+
+    return handleAsync(() async {
+      final result = await _reportService.getReports(
+        page: _currentPage,
+        filters: _filters,
+      );
+
+      if (result['success']) {
+        final newReports = List<Map<String, dynamic>>.from(result['reports'] ?? []);
+        if (newReports.isEmpty) {
+          _hasMoreData = false;
+        } else {
+          _reports.addAll(newReports);
+          _currentPage++;
+        }
+      } else {
+        setError(result['message']);
+      }
+    }, errorMessage: 'Failed to load reports');
+  }
+
+  Future<void> createReport(Map<String, dynamic> reportData) async {
+    return handleAsync(() async {
+      final result = await _reportService.createReport(reportData);
+      if (result['success']) {
+        await loadReports(refresh: true);
+      } else {
+        final errorMessage = result['message'];
+        final errorDetails = result['details'] as Map<String, dynamic>?;
         
-        _devices = List<Map<String,dynamic>>.from(devicesResult['data']['devices'])
-          .map((d) => {
-            'id': convertField(d['id']),
-            'name': d['name'] ?? 'Unnamed Device',
-            'type': d['device_subcategory']?['device_type']?['name'] ?? 'Unknown'
-          }).toList();
-        
-        _deviceReports = List<Map<String, dynamic>>.from(reportsResult['reports']);
+        if (errorDetails != null && errorDetails.isNotEmpty) {
+          setError('$errorMessage: ${errorDetails.values.join(', ')}');
+        } else {
+          setError(result['message']);
+        }
+      }
+    }, errorMessage: 'Failed to create report');
+  }
+
+  Future<void> updateReport(int id, Map<String, dynamic> reportData) async {
+    return handleAsync(() async {
+      final result = await _reportService.updateReport(id, reportData);
+      if (result['success']) {
+        final index = _reports.indexWhere((report) => report['id'] == id);
+        if (index != -1) {
+          _reports[index] = {..._reports[index], ...reportData};
+          notifyListeners();
+        }
+      } else {
+        setError(result['message']);
+      }
+    }, errorMessage: 'Failed to update report');
+  }
+
+  Future<void> deleteReport(int id) async {
+    return handleAsync(() async {
+      final result = await _reportService.deleteReport(id);
+      if (result['success']) {
+        _reports.removeWhere((report) => report['id'] == id);
         notifyListeners();
       } else {
-        _error = reportsResult['message'] ?? 'Failed to load reports';
+        setError(result['message']);
       }
-    } catch (e) {
-      _error = 'Failed to load device reports';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    }, errorMessage: 'Failed to delete report');
   }
 
-  Future<void> loadOfficeReports() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final result = await _reportService.getOfficeReports();
-      if (result['success']) {
-        _officeReports = List<Map<String, dynamic>>.from(result['reports']);
-      } else {
-        _error = reportsResult['message'] ?? 'Failed to load reports';
-      }
-    } catch (e) {
-      _error = 'Failed to load office reports';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+  void updateFilters(Map<String, dynamic> newFilters) {
+    _filters = newFilters;
+    loadReports(refresh: true);
   }
 
-  Future<void> loadNotifications() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> loadNotifications({bool refresh = false}) async {
+    if (refresh) {
+      _notifications = [];
+    }
 
-    try {
+    return handleAsync(() async {
       final result = await _reportService.getNotifications();
       if (result['success']) {
-        _notifications = List<Map<String, dynamic>>.from(result['notifications']);
-        _updateUnreadCount();
+        _notifications = List<Map<String, dynamic>>.from(result['data'] ?? []);
       } else {
-        _error = reportsResult['message'] ?? 'Failed to load reports';
+        setError(result['message']);
       }
-    } catch (e) {
-      _error = 'Failed to load notifications';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    }, errorMessage: 'Failed to load notifications');
   }
 
-  Future<bool> markNotificationAsRead(int id) async {
-    try {
+  Future<void> markNotificationAsRead(int id) async {
+    return handleAsync(() async {
       final result = await _reportService.markNotificationAsRead(id);
       if (result['success']) {
         final index = _notifications.indexWhere((notification) => notification['id'] == id);
         if (index != -1) {
-          _notifications[index]['read'] = true;
-          _updateUnreadCount();
+          _notifications[index] = {..._notifications[index], 'read': true};
           notifyListeners();
         }
-        return true;
       } else {
-        _error = reportsResult['message'] ?? 'Failed to load reports';
-        return false;
+        setError(result['message']);
       }
-    } catch (e) {
-      _error = 'Failed to mark notification as read';
-      return false;
-    }
+    }, errorMessage: 'Failed to mark notification as read');
   }
 
-  Future<bool> clearAllNotifications() async {
-    try {
+  Future<void> clearAllNotifications() async {
+    return handleAsync(() async {
       final result = await _reportService.clearAllNotifications();
       if (result['success']) {
-        _notifications.clear();
+        _notifications = [];
         notifyListeners();
-        return true;
       } else {
-        _error = reportsResult['message'] ?? 'Failed to load reports';
-        return false;
+        setError(result['message']);
       }
-    } catch (e) {
-      _error = 'Failed to clear notifications';
-      return false;
-    }
-  }
-
-  set isLoading(bool value) {
-    _isLoading = value;
-    notifyListeners();
-  }
-
-  set error(String? value) {
-    _error = value;
-    notifyListeners();
-  }
-
-  set notifications(List<Map<String, dynamic>> value) {
-    _notifications = value;
-    _updateUnreadCount();
-    notifyListeners();
-  }
-
-  void _updateUnreadCount() {
-    _unreadCount = _notifications.where((notification) => !(notification['read'] ?? false)).length;
-    notifyListeners();
+    }, errorMessage: 'Failed to clear notifications');
   }
 }

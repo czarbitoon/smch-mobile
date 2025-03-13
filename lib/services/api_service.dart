@@ -115,7 +115,7 @@ class ApiService {
 
   Map<String, dynamic> _handleResponse(http.Response response) {
     try {
-      final Map<String, dynamic> responseData = json.decode(response.body);
+      final dynamic responseData = json.decode(response.body);
 
       if (response.statusCode == 401) {
         _handleUnauthorized();
@@ -126,7 +126,15 @@ class ApiService {
         return _successResponse(responseData);
       }
 
-      return _errorResponse(response.statusCode, responseData);
+      if (responseData is Map<String, dynamic>) {
+        return _errorResponse(response.statusCode, responseData);
+      } else {
+        return {
+          'success': false,
+          'message': 'Request failed with status $response.statusCode',
+          'status': response.statusCode
+        };
+      }
     } catch (e) {
       _logError('Response handling', e);
       return _processError(response.statusCode);
@@ -166,6 +174,14 @@ class ApiService {
   }
 
   Map<String, dynamic> _errorResponse(int statusCode, Map<String, dynamic> data) {
+    if (statusCode == 422) {
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Validation failed',
+        'status': statusCode,
+        'errors': data['errors'] ?? {}
+      };
+    }
     return {
       'success': false,
       'message': data['message'] ?? 'Request failed with status $statusCode',
