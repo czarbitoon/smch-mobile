@@ -36,14 +36,14 @@ class StaffDashboard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    authProvider.user?['name'] ?? 'Staff',
+                    authProvider.user?.name ?? 'Staff',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                     ),
                   ),
                   Text(
-                    authProvider.user?['email'] ?? '',
+                    authProvider.user?.email ?? '',
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 14,

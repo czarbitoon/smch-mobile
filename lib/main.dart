@@ -12,6 +12,7 @@ import 'screens/login_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/staff_dashboard.dart';
 import 'screens/user_dashboard.dart';
+import 'screens/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,15 +38,15 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           colorScheme: ColorScheme.light(
             primary: Color(0xFF1976D2),
-            secondary: Color(0xFF2196F3),
-            tertiary: Color(0xFF64B5F6),
-            background: Colors.white,
-            surface: Colors.white,
             onPrimary: Colors.white,
+            secondary: Color(0xFF2196F3),
             onSecondary: Colors.white,
+            tertiary: Color(0xFF64B5F6),
             onTertiary: Colors.white,
-            onBackground: Colors.black,
-            onSurface: Colors.black,
+            surface: Colors.white,
+            onSurface: Colors.black87,
+            background: Colors.grey[50]!,
+            onBackground: Colors.black87,
           ),
           brightness: Brightness.light,
           useMaterial3: true,
@@ -60,6 +61,7 @@ class MyApp extends StatelessWidget {
           '/staff': (context) => StaffDashboard(),
           '/user': (context) => UserDashboard(),
           '/home': (context) => AuthWrapper(),
+          '/profile': (context) => ProfileScreen(),
         },
         onGenerateRoute: (settings) {
           // Handle dynamic routes here if needed
@@ -84,27 +86,29 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.watch<AuthProvider>();
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        if (authProvider.isLoading) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
 
-    if (authProvider.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
+        if (!authProvider.isAuthenticated) {
+          return const LoginScreen();
+        }
 
-    if (!authProvider.isAuthenticated) {
-      return const LoginScreen();
-    }
-
-    // Role-based navigation
-    if (authProvider.isAdmin) {
-      return const AdminDashboard();
-    } else if (authProvider.isStaff) {
-      return const StaffDashboard();
-    } else {
-      return const UserDashboard();
-    }
+        // Role-based navigation
+        if (authProvider.isAdmin) {
+          return const AdminDashboard();
+        } else if (authProvider.isStaff) {
+          return const StaffDashboard();
+        } else {
+          return const UserDashboard();
+        }
+      },
+    );
   }
 }

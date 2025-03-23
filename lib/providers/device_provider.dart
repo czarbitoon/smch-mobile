@@ -17,7 +17,17 @@ class DeviceProvider extends BaseProvider {
   int get lastPage => _lastPage;
   int get total => _total;
 
+  static const _cacheTimeout = Duration(minutes: 5);
+  DateTime? _lastFetchTime;
+
   Future<void> loadDevices({int? page}) async {
+    // Return cached data if within timeout
+    if (_lastFetchTime != null && 
+        DateTime.now().difference(_lastFetchTime!) < _cacheTimeout &&
+        _devices.isNotEmpty) {
+      return;
+    }
+
     await handleAsync(
       () async {
         final result = await _deviceService.getDevices(page: page ?? _currentPage);
@@ -86,8 +96,51 @@ class DeviceProvider extends BaseProvider {
     await handleAsync(
       () async {
         final result = await _deviceService.getDevices(filters: filters);
-        if (result['success']) {
-          _devices = List<Map<String, dynamic>>.from(result['devices']);
+        if (result['status'] == 401) {
+          _devices = [];
+          throw Exception(result['message']);
+        }
+
+        if (result['success'] == true && result['data'] != null) {
+          final data = result['data'] as Map<String, dynamic>;
+          final devicesData = data['devices'] as List? ?? [];
+          final newDevices = devicesData.map((device) {
+            final deviceMap = Map<String, dynamic>.from(device);
+            
+            final convertField = (dynamic value) => value is int 
+                ? value 
+                : int.tryParse(value.toString()) ?? 0;
+
+            deviceMap['id'] = convertField(deviceMap['id']);
+            deviceMap['office_id'] = deviceMap['office_id'] != null 
+                ? convertField(deviceMap['office_id']) 
+                : null;
+            deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
+            deviceMap['type'] = deviceMap['type']?['name'] ?? deviceMap['device_subcategory']?['device_type']?['name'] ?? 'Unknown';
+            deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
+                ? convertField(deviceMap['subcategory_id'])
+                : null;
+            deviceMap['type_id'] = deviceMap['device_subcategory']?['device_type']?['id'] != null
+                ? convertField(deviceMap['device_subcategory']['device_type']['id'])
+                : null;
+
+            return deviceMap;
+          }).where((d) => d['id'] != 0).toList();
+          
+          final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
+          final newCurrentPage = int.tryParse(pagination['current_page']?.toString() ?? '1') ?? 1;
+          final newLastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
+          final newTotal = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
+          final newPerPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
+
+          // Update state atomically
+          _devices = newDevices;
+          _currentPage = newCurrentPage;
+          _lastPage = newLastPage;
+          _total = newTotal;
+          _perPage = newPerPage;
+          _lastFetchTime = DateTime.now();
+          notifyListeners();
         } else {
           throw Exception(result['message']);
         }

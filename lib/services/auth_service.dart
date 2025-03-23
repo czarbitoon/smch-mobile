@@ -38,6 +38,7 @@ class AuthService {
       );
 
       if (tokenResponse.statusCode != 200) {
+        await _storage.deleteAll();
         return _handleErrorResponse(tokenResponse);
       }
 
@@ -157,5 +158,106 @@ class AuthService {
 
   void _logError(String method, dynamic error) {
     print('[AuthService] $method error: $error');
+  }
+
+  Future<List<Map<String, dynamic>>> getDevices() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/devices'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data['data'] ?? []);
+    } catch (e) {
+      _logError('getDevices', e);
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getReports() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return [];
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/reports'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data['data'] ?? []);
+    } catch (e) {
+      _logError('getReports', e);
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getUserProfile() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return {'success': false, 'message': 'Not authenticated'};
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/profile'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode != 200) {
+        return {'success': false, 'message': 'Failed to fetch profile'};
+      }
+
+      final data = json.decode(response.body);
+      return {'success': true, 'data': data};
+    } catch (e) {
+      _logError('getUserProfile', e);
+      return {'success': false, 'message': 'Error fetching profile: ${e.toString()}'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> profileData) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return {'success': false, 'message': 'Not authenticated'};
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/profile/update'),
+        headers: {
+          ..._headers,
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(profileData),
+      );
+
+      if (response.statusCode != 200) {
+        return {'success': false, 'message': 'Failed to update profile'};
+      }
+
+      final data = json.decode(response.body);
+      return {'success': true, 'data': data};
+    } catch (e) {
+      _logError('updateUserProfile', e);
+      return {'success': false, 'message': 'Error updating profile: ${e.toString()}'};
+    }
   }
 }

@@ -12,6 +12,7 @@ class ReportForm extends StatefulWidget {
 class _ReportFormState extends State<ReportForm> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
+  final _titleController = TextEditingController();
   String? _selectedDeviceId;
   String _selectedPriority = 'Medium';
   String _selectedStatus = 'Pending';
@@ -40,7 +41,10 @@ class _ReportFormState extends State<ReportForm> {
       final reportProvider = context.read<ReportProvider>();
       await reportProvider.submitReport(
         deviceId: _selectedDeviceId!,
+        title: _titleController.text,
         description: _descriptionController.text,
+        priority: _selectedPriority,
+        status: _selectedStatus,
       );
 
       if (mounted) {
@@ -91,6 +95,20 @@ class _ReportFormState extends State<ReportForm> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please select a device';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a title';
                     }
                     return null;
                   },

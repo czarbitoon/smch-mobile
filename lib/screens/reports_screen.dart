@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/reports_provider.dart';
 import '../providers/device_provider.dart';
+import '../providers/auth_provider.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -11,10 +12,15 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  String _selectedReportType = 'All';
-  final List<String> _reportTypes = ['All', 'Daily', 'Weekly', 'Monthly'];
-  final List<String> _priorityLevels = ['Low', 'Medium', 'High', 'Critical'];
-  final List<String> _statusOptions = ['Pending', 'In Progress', 'Resolved', 'Closed'];
+  String _selectedStatus = 'All';
+  String _selectedPriority = 'All';
+  final List<String> _statusOptions = ['All', 'Pending', 'In Progress', 'Resolved', 'Closed'];
+  final List<String> _priorityLevels = ['All', 'Low', 'Medium', 'High', 'Critical'];
+  
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  
+  bool get _isAdminOrStaff => context.read<AuthProvider>().isAdmin || context.read<AuthProvider>().isStaff;
 
   @override
   void initState() {
@@ -26,6 +32,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   void dispose() {
+    _titleController?.dispose();
+    _descriptionController?.dispose();
     super.dispose();
   }
 
@@ -52,37 +60,64 @@ class _ReportsScreenState extends State<ReportsScreen> {
             );
           }
 
-          final filteredReports = _selectedReportType == 'All'
-              ? reportsProvider.reports
-              : reportsProvider.reports
-                  .where((report) =>
-                      report['type']?.toString().toLowerCase() ==
-                      _selectedReportType.toLowerCase())
-                  .toList();
+          final filteredReports = reportsProvider.reports.where((report) {
+            if (_selectedStatus != 'All' && report['status']?.toString() != _selectedStatus) {
+              return false;
+            }
+            if (_selectedPriority != 'All' && report['priority']?.toString() != _selectedPriority) {
+              return false;
+            }
+            return true;
+          }).toList();
 
           return Column(
             children: [
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedReportType,
-                  decoration: const InputDecoration(
-                    labelText: 'Report Type',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _reportTypes.map((String type) {
-                    return DropdownMenuItem<String>(
-                      value: type,
-                      child: Text(type),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _selectedReportType = newValue;
-                      });
-                    }
-                  },
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Status',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _statusOptions.map((String status) {
+                        return DropdownMenuItem<String>(
+                          value: status,
+                          child: Text(status),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedStatus = newValue;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedPriority,
+                      decoration: const InputDecoration(
+                        labelText: 'Priority',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _priorityLevels.map((String priority) {
+                        return DropdownMenuItem<String>(
+                          value: priority,
+                          child: Text(priority),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedPriority = newValue;
+                          });
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
               Expanded(
@@ -98,8 +133,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Type: ${report['type'] ?? 'N/A'}'),
-                            Text('Generated: ${report['created_at'] ?? 'N/A'}'),
+                            Text('Generated: ${_formatDateTime(report['created_at'] ?? 'N/A')}'),
                             Text('Status: ${report['status'] ?? 'N/A'}'),
                           ],
                         ),
@@ -118,20 +152,35 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('Type: ${details['type'] ?? 'N/A'}'),
                                       Text('Status: ${details['status'] ?? 'N/A'}'),
-                                      Text('Generated: ${details['created_at'] ?? 'N/A'}'),
+                                      Text('Generated: ${_formatDateTime(details['created_at'] ?? 'N/A')}'),
                                       const SizedBox(height: 8),
-                                      const Text('Summary:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      Text(details['summary'] ?? 'No summary available'),
+                                      const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      Text(details['description'] ?? 'No description available'),
                                       const SizedBox(height: 8),
-                                      const Text('Devices:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ...(details['devices'] as List<dynamic>? ?? [])
-                                          .map((device) => Padding(
-                                                padding: const EdgeInsets.only(left: 8.0),
-                                                child: Text('- ${device['name']} (${device['status']})'),
-                                              ))
-                                          .toList(),
+                                      if (details['device'] != null) ...[                                        
+                                        const Text('Device:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        Text('${details['device']['name'] ?? 'N/A'}')
+                                      ],
+                                      if (details['status'] != 'resolved' && (context.read<AuthProvider>().isAdmin || context.read<AuthProvider>().isStaff)) ...[                                        
+                                        const SizedBox(height: 16),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            final reportId = details['id'];
+                                            if (reportId != null) {
+                                              _showResolveDialog(context, int.parse(reportId.toString()));
+                                            } else {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Invalid report ID'),
+                                                  backgroundColor: Colors.red,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          child: const Text('Resolve Report')
+                                        )
+                                      ]
                                     ],
                                   ),
                                 ),
@@ -170,18 +219,105 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  Future<void> _showResolveDialog(BuildContext context, int reportId) async {
+    final resolutionController = TextEditingController();
+    bool isSubmitting = false;
+
+    return showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Resolve Report'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: resolutionController,
+                decoration: const InputDecoration(
+                  labelText: 'Resolution Notes',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (resolutionController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please provide resolution notes'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() => isSubmitting = true);
+
+                      try {
+                        final success = await context.read<ReportsProvider>().resolveReport(
+                              reportId,
+                              resolutionController.text.trim(),
+                            );
+
+                        if (!context.mounted) return;
+
+                        Navigator.pop(context);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success
+                                  ? 'Report resolved successfully'
+                                  : 'Failed to resolve report',
+                            ),
+                            backgroundColor: success ? Colors.green : Colors.red,
+                          ),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error resolving report: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } finally {
+                        if (mounted) {
+                          setState(() => isSubmitting = false);
+                        }
+                      }
+                    },
+              child: Text(isSubmitting ? 'Resolving...' : 'Resolve'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showAddReportDialog() async {
     final _formKey = GlobalKey<FormState>();
     final _descriptionController = TextEditingController();
     String _selectedPriority = 'Medium';
-    String _selectedStatus = 'Pending';
     int? _selectedDeviceId;
     bool _isSubmitting = false;
     bool _isLoadingDevices = true;
     List<Map<String, dynamic>> _devices = [];
-
-    final List<String> _priorityLevels = ['Low', 'Medium', 'High', 'Critical'];
-    final List<String> _statusOptions = ['Pending', 'In Progress', 'Resolved', 'Closed'];
+    
+    // Clean up the controller when the dialog is closed
+    void dispose() {
+      _descriptionController.dispose();
+    }
 
     return showDialog(
       context: context,
@@ -207,11 +343,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Device selection dropdown
                     DropdownButtonFormField<int>(
                       value: _selectedDeviceId,
                       decoration: const InputDecoration(
-                        labelText: 'Select Device',
+                        labelText: 'Device',
                         border: OutlineInputBorder(),
                       ),
                       hint: const Text('Select a device'),
@@ -238,34 +373,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         labelText: 'Priority',
                         border: OutlineInputBorder(),
                       ),
-                      items: _priorityLevels.map((priority) {
-                        return DropdownMenuItem(
+                      items: _priorityLevels.map((String priority) {
+                        return DropdownMenuItem<String>(
                           value: priority,
                           child: Text(priority),
                         );
                       }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedPriority = value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _selectedStatus,
-                      decoration: const InputDecoration(
-                        labelText: 'Status',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _statusOptions.map((status) {
-                        return DropdownMenuItem(
-                          value: status,
-                          child: Text(status),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedStatus = value);
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedPriority = newValue;
+                          });
                         }
                       },
                     ),
@@ -273,8 +391,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     TextFormField(
                       controller: _descriptionController,
                       decoration: const InputDecoration(
-                        labelText: 'Description',
-                        hintText: 'Enter report description',
+                        labelText: 'Describe the Issue',
+                        hintText: 'Please provide details about the issue you\'re experiencing with this device',
                         border: OutlineInputBorder(),
                       ),
                       maxLines: 3,
@@ -291,7 +409,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.pop(context),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
@@ -300,29 +418,59 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     : () async {
                         if (!_formKey.currentState!.validate()) return;
 
+                        if (!mounted) return;
                         setState(() => _isSubmitting = true);
 
                         try {
-                          final reportsProvider = context.read<ReportsProvider>();
+                          final reportsProvider = Provider.of<ReportsProvider>(
+                            context,
+                            listen: false,
+                          );
+
+                          final selectedDevice = _devices.firstWhere(
+                            (device) => device['id'] == _selectedDeviceId,
+                            orElse: () => {'name': 'Device'},
+                          );
+
                           final success = await reportsProvider.submitReport(
+                            deviceId: _selectedDeviceId!,
+                            title: 'Issue Report - ${selectedDevice['name']}',
                             description: _descriptionController.text,
                             priority: _selectedPriority,
-                            status: _selectedStatus,
-                            deviceId: _selectedDeviceId,
+                            status: 'Pending',
                           );
+
+                          if (!mounted) return;
 
                           if (success) {
                             Navigator.of(context).pop();
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Report submitted successfully')),
+                              const SnackBar(
+                                content: Text('Report submitted successfully'),
+                                backgroundColor: Colors.green,
+                              ),
                             );
                           } else {
+                            if (mounted) {
+                              setState(() => _isSubmitting = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(reportsProvider.error ?? 'Failed to submit report'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            setState(() => _isSubmitting = false);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(reportsProvider.error ?? 'Failed to submit report')),
+                              SnackBar(
+                                content: Text('Error submitting report: $e'),
+                                backgroundColor: Colors.red,
+                              ),
                             );
                           }
-                        } finally {
-                          setState(() => _isSubmitting = false);
                         }
                       },
                 child: _isSubmitting
@@ -340,3 +488,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 }
+
+  String _formatDateTime(String dateTimeStr) {
+    if (dateTimeStr == 'N/A') return dateTimeStr;
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateTimeStr;
+    }
+  }

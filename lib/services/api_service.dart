@@ -31,6 +31,9 @@ class ApiService {
       return _formatError();
     } catch (e) {
       _logError('GET', e);
+      if (e is UnauthorizedException) {
+        return {'success': false, 'message': e.toString()};
+      }
       return _connectionError();
     }
   }
@@ -81,6 +84,23 @@ class ApiService {
       return _formatError();
     } catch (e) {
       _logError('DELETE', e);
+      return _connectionError();
+    }
+  }
+
+  Future<Map<String, dynamic>> patch(String endpoint, dynamic body) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl${endpoint.startsWith('/') ? endpoint : '/$endpoint'}'),
+        headers: await _getHeaders(),
+        body: json.encode(body),
+      );
+      return _handleResponse(response);
+    } on FormatException catch (e) {
+      _logError('PATCH', e);
+      return _formatError();
+    } catch (e) {
+      _logError('PATCH', e);
       return _connectionError();
     }
   }

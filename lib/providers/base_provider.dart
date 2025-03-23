@@ -26,7 +26,10 @@ class BaseProvider extends ChangeNotifier {
     Future<T> Function() operation, {
     String errorMessage = 'Operation failed',
   }) async {
-    if (_isLoading) return Future.error('Operation in progress');
+    if (_isLoading) {
+      await Future.delayed(Duration(milliseconds: 100));
+      return handleAsync(operation, errorMessage: errorMessage);
+    }
 
     setLoading(true);
     clearError();

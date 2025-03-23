@@ -97,11 +97,12 @@ class DeviceCard extends StatelessWidget {
                                 : () async {
                                     final success = await reportProvider.submitReport(
                                       deviceId: device['id'],
+                                      title: 'Device Issue Report',
                                       description: descriptionController.text,
                                       priority: 'Medium',
                                       status: 'Pending',
                                     );
-                                    if (success) {
+                                    if (success == true) {
                                       Navigator.pop(context);
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(

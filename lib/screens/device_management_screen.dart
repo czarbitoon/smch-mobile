@@ -20,10 +20,10 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   String? _selectedOffice;
   String? _selectedStatus;
 
-  final List<String> _statusOptions = ['Available', 'In Use', 'Maintenance', 'Retired'];
+  final List<String> _statusOptions = ['active', 'inactive', 'maintenance'];
 
   String? _filterStatus = null;
-  String? _filterOffice = null;
+  String? _filterOffice = null;r
   String? _filterType = null;
   final Set<String> _deviceTypes = {};
 
