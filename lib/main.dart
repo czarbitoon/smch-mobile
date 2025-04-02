@@ -8,7 +8,9 @@ import 'providers/office_provider.dart';
 import 'providers/device_provider.dart';
 import 'providers/device_report_provider.dart';
 import 'providers/reports_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/admin_dashboard.dart';
 import 'screens/staff_dashboard.dart';
 import 'screens/user_dashboard.dart';
@@ -17,46 +19,81 @@ import 'screens/profile_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SharedPreferences.getInstance();
-  runApp(const MyApp());
+  
+  // Pre-load theme preference before rendering the app
+  final themeProvider = ThemeProvider();
+  await themeProvider.initTheme();
+
+  // Initialize office provider and fetch offices
+  final officeProvider = OfficeProvider();
+  await officeProvider.loadOffices();
+  
+  runApp(MyApp(themeProvider: themeProvider, officeProvider: officeProvider));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ThemeProvider themeProvider;
+  final OfficeProvider officeProvider;
+  
+  const MyApp({super.key, required this.themeProvider, required this.officeProvider});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider.value(value: themeProvider),
+        ChangeNotifierProvider.value(value: officeProvider),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => OfficeProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
         ChangeNotifierProvider(create: (_) => DeviceReportProvider()),
         ChangeNotifierProvider(create: (_) => ReportsProvider(ApiService())),
       ],
-      child: MaterialApp(
-        title: 'SMCH Mobile',
-        theme: ThemeData(
-          colorScheme: ColorScheme.light(
-            primary: Color(0xFF1976D2),
-            onPrimary: Colors.white,
-            secondary: Color(0xFF2196F3),
-            onSecondary: Colors.white,
-            tertiary: Color(0xFF64B5F6),
-            onTertiary: Colors.white,
-            surface: Colors.white,
-            onSurface: Colors.black87,
-            background: Colors.grey[50]!,
-            onBackground: Colors.black87,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: 'SMCH Mobile',
+          themeMode: themeProvider.themeMode,
+          theme: ThemeData(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF1976D2),
+              onPrimary: Colors.white,
+              secondary: Color(0xFF2196F3),
+              onSecondary: Colors.white,
+              tertiary: Color(0xFF64B5F6),
+              onTertiary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black87,
+              background: Colors.grey[50]!,
+              onBackground: Colors.black87,
+            ),
+            brightness: Brightness.light,
+            useMaterial3: true,
+            textTheme: GoogleFonts.robotoTextTheme(
+              Theme.of(context).textTheme,
+            ),
           ),
-          brightness: Brightness.light,
-          useMaterial3: true,
-          textTheme: GoogleFonts.robotoTextTheme(
-            Theme.of(context).textTheme,
+          darkTheme: ThemeData(
+            colorScheme: ColorScheme.dark(
+              primary: Color(0xFF90CAF9),
+              onPrimary: Colors.black,
+              secondary: Color(0xFF64B5F6),
+              onSecondary: Colors.black,
+              tertiary: Color(0xFF42A5F5),
+              onTertiary: Colors.black,
+              surface: Color(0xFF121212),
+              onSurface: Colors.white,
+              background: Color(0xFF121212),
+              onBackground: Colors.white,
+            ),
+            brightness: Brightness.dark,
+            useMaterial3: true,
+            textTheme: GoogleFonts.robotoTextTheme(
+              ThemeData.dark().textTheme,
+            ),
           ),
-        ),
-        initialRoute: '/login',
-        routes: {
+          initialRoute: '/login',
+          routes: {
           '/login': (context) => LoginScreen(),
+          '/register': (context) => RegisterScreen(),
           '/admin': (context) => AdminDashboard(),
           '/staff': (context) => StaffDashboard(),
           '/user': (context) => UserDashboard(),
@@ -77,7 +114,7 @@ class MyApp extends StatelessWidget {
           );
         },
       ),
-    );
+    ));
   }
 }
 

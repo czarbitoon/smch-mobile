@@ -11,21 +11,51 @@ class OfficeProvider extends BaseProvider {
   Future<void> loadOffices() async {
     await handleAsync(
       () async {
+        debugPrint('loadOffices: Starting to fetch offices');
         final result = await _officeService.getOffices();
+        debugPrint('loadOffices: Received API response with success=${result['success']}');
 
-        if (result['success'] == true && result['offices'] != null) {
-          final officesList = List<Map<String, dynamic>>.from(result['offices']);
-          _offices = officesList.where((office) => 
-            office != null && 
-            office['id'] != null && 
-            office['name'] != null && 
-            office['name'].toString().isNotEmpty
-          ).toList();
-          debugPrint('loadOffices: Transformed ${_offices.length} valid offices');
-          debugPrint('loadOffices: Office data: ${_offices.map((o) => "${o['id']}: ${o['name']}").join(', ')}');
+        if (result['success'] == true) {
+          if (result['offices'] == null) {
+            debugPrint('loadOffices: No offices data in response');
+            _offices = [];
+            return;
+          }
+
+          try {
+            final officesList = List<Map<String, dynamic>>.from(result['offices']);
+            debugPrint('loadOffices: Processing ${officesList.length} offices');
+
+            _offices = officesList.where((office) {
+              if (office == null) {
+                debugPrint('loadOffices: Found null office entry');
+                return false;
+              }
+
+              final bool isValid = office['id'] != null && 
+                                 office['name'] != null && 
+                                 office['name'].toString().isNotEmpty;
+
+              if (!isValid) {
+                debugPrint('loadOffices: Invalid office data: id=${office['id']}, name=${office['name']}');
+              }
+
+              return isValid;
+            }).toList();
+
+            debugPrint('loadOffices: Successfully processed ${_offices.length} valid offices');
+            if (_offices.length != officesList.length) {
+              debugPrint('loadOffices: Filtered out ${officesList.length - _offices.length} invalid offices');
+            }
+          } catch (e) {
+            debugPrint('loadOffices: Error processing office data: $e');
+            setError('Invalid office data format');
+            _offices = [];
+          }
         } else {
-          debugPrint('loadOffices: API returned error: ${result['message']}');
-          setError(result['message'] ?? 'Failed to load offices');
+          final errorMessage = result['message'] ?? 'Failed to load offices';
+          debugPrint('loadOffices: API returned error: $errorMessage');
+          setError(errorMessage);
           _offices = [];
         }
       },

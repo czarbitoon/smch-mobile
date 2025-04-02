@@ -65,6 +65,38 @@ class AuthProvider extends BaseProvider {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getOffices() async {
+    if (_isInitializing || _isLoadingProfile) {
+      return [];
+    }
+
+    try {
+      return await _authService.getOffices();
+    } catch (e) {
+      setError('Failed to fetch offices: ${e.toString()}');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> register(String name, String email, String password, int type, String officeId) async {
+    if (_isInitializing || _isLoadingProfile) {
+      return {'success': false, 'message': 'Authentication operation in progress'};
+    }
+
+    setLoading(true);
+    clearError();
+
+    try {
+      final result = await _authService.register(name, email, password, type, officeId);
+      return result;
+    } catch (e) {
+      setError('Registration failed: ${e.toString()}');
+      return {'success': false, 'message': e.toString()};
+    } finally {
+      setLoading(false);
+    }
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     if (_isInitializing || _isLoadingProfile) {
       return {'success': false, 'message': 'Authentication operation in progress'};

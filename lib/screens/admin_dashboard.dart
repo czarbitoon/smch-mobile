@@ -15,6 +15,9 @@ class AdminDashboard extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -27,27 +30,37 @@ class AdminDashboard extends StatelessWidget {
           children: [
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
+                color: Theme.of(context).colorScheme.primary,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 30,
-                    child: Icon(Icons.person, size: 30),
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    child: Icon(Icons.person,
+                        size: 30,
+                        color: Theme.of(context).colorScheme.onSecondary),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     authProvider.user?.name ?? 'Admin',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontSize: 18,
                     ),
                   ),
                   Text(
                     authProvider.user?.email ?? '',
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
@@ -103,7 +116,15 @@ class AdminDashboard extends StatelessWidget {
         crossAxisSpacing: 16.0,
         children: [
           Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
             child: InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () {
                 Navigator.push(
                   context,
@@ -114,7 +135,7 @@ class AdminDashboard extends StatelessWidget {
               },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Icon(Icons.devices, size: 48.0),
                   SizedBox(height: 16.0),
                   Text('Device Management'),
@@ -123,7 +144,15 @@ class AdminDashboard extends StatelessWidget {
             ),
           ),
           Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
             child: InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () {
                 Navigator.push(
                   context,
@@ -134,7 +163,7 @@ class AdminDashboard extends StatelessWidget {
               },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Icon(Icons.business, size: 48.0),
                   SizedBox(height: 16.0),
                   Text('Office Management'),
@@ -143,7 +172,15 @@ class AdminDashboard extends StatelessWidget {
             ),
           ),
           Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
             child: InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () {
                 Navigator.push(
                   context,

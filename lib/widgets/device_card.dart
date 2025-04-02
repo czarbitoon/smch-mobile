@@ -40,7 +40,7 @@ class DeviceCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildInfoRow(Icons.category, 'Type', device['type']?.toString() ?? 'Unknown', theme, isPlaceholder: device['type'] == null),
+            _buildInfoRow(Icons.devices, 'Type', device['type']?.toString() ?? 'Unknown', theme, isPlaceholder: device['type'] == null),
             const SizedBox(height: 8),
             _buildInfoRow(
               Icons.business,

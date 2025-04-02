@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../models/user_model.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../widgets/theme_toggle.dart';
 
 class ProfileScreen extends StatefulWidget {
   static const routeName = '/profile';
@@ -180,6 +181,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
+                  // Theme Toggle
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  const ThemeToggle(),
+                  const SizedBox(height: 8),
+                  const Divider(),
                   TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(
@@ -198,6 +208,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
+                  // Theme Toggle
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  const ThemeToggle(),
+                  const SizedBox(height: 8),
+                  const Divider(),
                   
                   // Office Info (Read-only)
                   Container(

@@ -42,7 +42,42 @@ class DeviceService {
   }
 
   Future<Map<String, dynamic>> getDeviceTypes() async {
-    return _handleApiCall(() => _apiService.get('device-types'), 'fetch device types');
+    try {
+      // First, fetch all device categories
+      final categoriesResponse = await _apiService.get('device-categories');
+      if (!categoriesResponse['success']) {
+        return {'success': false, 'message': categoriesResponse['message'] ?? 'Failed to fetch device categories'};
+      }
+      
+      final categories = categoriesResponse['data'] as List? ?? [];
+      final allTypes = <Map<String, dynamic>>[];
+      
+      // For each category, fetch its types
+      for (var category in categories) {
+        if (category is Map<String, dynamic> && category['id'] != null) {
+          final categoryId = category['id'];
+          final typesResponse = await _apiService.get('device-categories/$categoryId/types');
+          
+          if (typesResponse['success'] && typesResponse['data'] is List) {
+            final types = typesResponse['data'] as List;
+            for (var type in types) {
+              if (type is Map<String, dynamic>) {
+                // Add category information to each type
+                type['category'] = {
+                  'id': category['id'],
+                  'name': category['name']
+                };
+                allTypes.add(type);
+              }
+            }
+          }
+        }
+      }
+      
+      return {'success': true, 'data': allTypes};
+    } catch (e, stackTrace) {
+      return _handleError(e, stackTrace, 'Failed to fetch device types');
+    }
   }
 
   Future<Map<String, dynamic>> _handleApiCall(Future<Map<String, dynamic>> Function() apiCall, String action) async {

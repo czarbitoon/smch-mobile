@@ -17,7 +17,7 @@ class DeviceProvider extends BaseProvider {
   int get lastPage => _lastPage;
   int get total => _total;
 
-  static const _cacheTimeout = Duration(minutes: 5);
+  static const _cacheTimeout = Duration(hours: 24);
   DateTime? _lastFetchTime;
 
   Future<void> loadDevices({int? page}) async {
@@ -54,6 +54,9 @@ class DeviceProvider extends BaseProvider {
                 : null;
             deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
             deviceMap['type'] = deviceMap['type']?['name'] ?? deviceMap['device_subcategory']?['device_type']?['name'] ?? 'Unknown';
+            deviceMap['category'] = deviceMap['category']?['name'] ?? 
+                deviceMap['device_subcategory']?['device_type']?['device_category']?['name'] ?? 
+                'Unknown';
             deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
                 ? convertField(deviceMap['subcategory_id'])
                 : null;
@@ -82,19 +85,101 @@ class DeviceProvider extends BaseProvider {
     await handleAsync(
       () async {
         final result = await _deviceService.getDeviceTypes();
-        if (result['success']) {
-          _deviceTypes = List<Map<String, dynamic>>.from(result['types']);
-        } else {
+        if (result['status'] == 401) {
+          _deviceTypes = [];
           throw Exception(result['message']);
         }
+        
+        if (result['success'] && result['data'] != null) {
+          final types = result['data'] as List? ?? [];
+          
+          _deviceTypes = types.map((type) {
+            if (type is Map) {
+              final typeMap = Map<String, dynamic>.from(type);
+              
+              // Unified type conversion
+              final convertField = (dynamic value) => value is int 
+                  ? value 
+                  : int.tryParse(value.toString()) ?? 0;
+              
+              final id = typeMap['id'] != null 
+                  ? convertField(typeMap['id']) 
+                  : 0;
+              final name = typeMap['name']?.toString() ?? 'Unknown';
+              
+              return {
+                'id': id, 
+                'name': name
+              };
+            }
+            return {'id': 0, 'name': 'Unknown'};
+          }).where((type) => type['id'] != 0).toList(); // Filter invalid entries
+          
+          _lastFetchTime = DateTime.now();
+          notifyListeners();
+        } else {
+          throw Exception(result['message'] ?? 'Failed to load device types');
+        }
       },
-      errorMessage: 'Failed to load device types',
+      errorMessage: 'Failed to load device types'
     );
+  }
+
+  Map<String, dynamic> _processTypeFilter(Map<String, dynamic> filters) {
+    final processedFilters = Map<String, dynamic>.from(filters);
+    
+    if (processedFilters.containsKey('type') && processedFilters['type'] != null) {
+      final typeName = processedFilters['type'].toString().trim();
+      if (typeName.isNotEmpty) {
+        final typeEntry = _deviceTypes.firstWhere(
+          (type) => type['name'].toString().toLowerCase() == typeName.toLowerCase(),
+          orElse: () => {'id': 0, 'name': 'Unknown'} as Map<String, Object>
+        );
+        
+        if (typeEntry['id'] != 0) {
+          processedFilters['type_id'] = typeEntry['id'].toString();
+        }
+      }
+      // Remove the type field as we've processed it into type_id
+      processedFilters.remove('type');
+    }
+    
+    return processedFilters;
+  }
+
+  Map<String, dynamic> _transformDeviceData(dynamic device) {
+    final deviceMap = Map<String, dynamic>.from(device);
+    
+    final convertField = (dynamic value) => value is int 
+        ? value 
+        : int.tryParse(value.toString()) ?? 0;
+
+    deviceMap['id'] = convertField(deviceMap['id']);
+    deviceMap['office_id'] = deviceMap['office_id'] != null 
+        ? convertField(deviceMap['office_id']) 
+        : null;
+    deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
+    deviceMap['type'] = deviceMap['type']?['name'] ?? 
+        deviceMap['device_subcategory']?['device_type']?['name'] ?? 
+        'Unknown';
+    deviceMap['category'] = deviceMap['category']?['name'] ?? 
+        deviceMap['device_subcategory']?['device_type']?['device_category']?['name'] ?? 
+        'Unknown';
+    deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
+        ? convertField(deviceMap['subcategory_id'])
+        : null;
+    deviceMap['type_id'] = deviceMap['device_subcategory']?['device_type']?['id'] != null
+        ? convertField(deviceMap['device_subcategory']['device_type']['id'])
+        : null;
+
+    return deviceMap;
   }
 
   Future<void> applyFilters(Map<String, dynamic> filters) async {
     await handleAsync(
       () async {
+        final processedFilters = _processTypeFilter(filters);
+        
         final result = await _deviceService.getDevices(filters: filters);
         if (result['status'] == 401) {
           _devices = [];
@@ -104,28 +189,11 @@ class DeviceProvider extends BaseProvider {
         if (result['success'] == true && result['data'] != null) {
           final data = result['data'] as Map<String, dynamic>;
           final devicesData = data['devices'] as List? ?? [];
-          final newDevices = devicesData.map((device) {
-            final deviceMap = Map<String, dynamic>.from(device);
-            
-            final convertField = (dynamic value) => value is int 
-                ? value 
-                : int.tryParse(value.toString()) ?? 0;
+          final newDevices = devicesData
+              .map(_transformDeviceData)
+              .where((d) => d['id'] != 0)
+              .toList();
 
-            deviceMap['id'] = convertField(deviceMap['id']);
-            deviceMap['office_id'] = deviceMap['office_id'] != null 
-                ? convertField(deviceMap['office_id']) 
-                : null;
-            deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
-            deviceMap['type'] = deviceMap['type']?['name'] ?? deviceMap['device_subcategory']?['device_type']?['name'] ?? 'Unknown';
-            deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
-                ? convertField(deviceMap['subcategory_id'])
-                : null;
-            deviceMap['type_id'] = deviceMap['device_subcategory']?['device_type']?['id'] != null
-                ? convertField(deviceMap['device_subcategory']['device_type']['id'])
-                : null;
-
-            return deviceMap;
-          }).where((d) => d['id'] != 0).toList();
           
           final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
           final newCurrentPage = int.tryParse(pagination['current_page']?.toString() ?? '1') ?? 1;

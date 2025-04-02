@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'api_service.dart';
 
 class AuthService {
   static const String baseUrl = 'http://localhost:8000/api';
@@ -149,9 +150,37 @@ class AuthService {
 
   Map<String, dynamic> _handleErrorResponse(http.Response response) {
     try {
-      final error = json.decode(response.body);
-      return {'success': false, 'message': error['message'] ?? 'Authentication failed'};
+      final responseBody = json.decode(response.body);
+      
+      // Check for validation errors structure
+      if (responseBody.containsKey('errors') && responseBody['errors'] is Map) {
+        final errors = responseBody['errors'] as Map;
+        
+        // Check specifically for email validation errors
+        if (errors.containsKey('email')) {
+          final emailErrors = errors['email'] as List;
+          if (emailErrors.isNotEmpty) {
+            // If there's a specific email error, prioritize showing it clearly
+            return {'success': false, 'message': 'Email error: ${emailErrors.join(', ')}'};
+          }
+        }
+        
+        // Format all validation errors into a readable message
+        final errorMessages = errors.entries
+            .map((e) => '${e.key}: ${(e.value as List).join(', ')}')
+            .join('\n');
+        return {'success': false, 'message': 'Validation failed:\n$errorMessages'};
+      }
+      
+      // Check for error message
+      if (responseBody.containsKey('error')) {
+        return {'success': false, 'message': responseBody['error']};
+      }
+      
+      // Fallback to message or default
+      return {'success': false, 'message': responseBody['message'] ?? 'Authentication failed'};
     } catch (e) {
+      _logError('handleErrorResponse', e);
       return {'success': false, 'message': 'Server error: ${response.statusCode}'};
     }
   }
@@ -178,7 +207,25 @@ class AuthService {
       }
 
       final data = json.decode(response.body);
-      return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      
+      // Handle different response structures
+      if (data is Map<String, dynamic>) {
+        if (data['data'] is List) {
+          return List<Map<String, dynamic>>.from(data['data']);
+        } else if (data['data'] is Map<String, dynamic>) {
+          // If data['data'] is a map that contains a 'devices' list
+          final devicesData = data['data']['devices'];
+          if (devicesData is List) {
+            return List<Map<String, dynamic>>.from(devicesData);
+          }
+        } else if (data['devices'] is List) {
+          // Direct 'devices' field in response
+          return List<Map<String, dynamic>>.from(data['devices']);
+        }
+      }
+      
+      // Fallback to empty list if structure doesn't match expected format
+      return [];
     } catch (e) {
       _logError('getDevices', e);
       return [];
@@ -203,10 +250,143 @@ class AuthService {
       }
 
       final data = json.decode(response.body);
-      return List<Map<String, dynamic>>.from(data['data'] ?? []);
+      
+      // Handle different response structures
+      if (data is Map<String, dynamic>) {
+        if (data['data'] is List) {
+          return List<Map<String, dynamic>>.from(data['data']);
+        } else if (data['data'] is Map<String, dynamic>) {
+          // If data['data'] is a map that contains a 'reports' list
+          final reportsData = data['data']['reports'];
+          if (reportsData is List) {
+            return List<Map<String, dynamic>>.from(reportsData);
+          }
+        } else if (data['reports'] is List) {
+          // Direct 'reports' field in response
+          return List<Map<String, dynamic>>.from(data['reports']);
+        }
+      }
+      
+      // Fallback to empty list if structure doesn't match expected format
+      return [];
     } catch (e) {
       _logError('getReports', e);
       return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getOffices() async {
+    try {
+      // Create an instance of ApiService which properly handles unprotected endpoints
+      final apiService = ApiService();
+      
+      // Use ApiService to make the request to the unprotected offices endpoint
+      final response = await apiService.get('offices');
+      
+      if (!response['success']) {
+        _logError('getOffices', 'API returned error: ${response['message']}');
+        return [];
+      }
+      
+      // Extract offices data from the response
+      final data = response['data'];
+      _logError('getOffices', 'Response data: ${data.toString().substring(0, data.toString().length > 100 ? 100 : data.toString().length)}...');
+      
+      // Handle different response structures
+      if (data is List) {
+        // Direct list of offices
+        return List<Map<String, dynamic>>.from(data);
+      } else if (data is Map<String, dynamic>) {
+        if (data['data'] is List) {
+          // If data['data'] is a list of offices
+          return List<Map<String, dynamic>>.from(data['data']);
+        } else if (data['data'] is Map<String, dynamic>) {
+          // If data['data'] is a map that contains an 'offices' list
+          final officesData = data['data']['offices'];
+          if (officesData is List) {
+            return List<Map<String, dynamic>>.from(officesData);
+          }
+        } else if (data['offices'] is List) {
+          // Direct 'offices' field in response
+          return List<Map<String, dynamic>>.from(data['offices']);
+        }
+      }
+      
+      // Fallback to empty list if structure doesn't match expected format
+      _logError('getOffices', 'Could not parse response format');
+      return [];
+    } catch (e) {
+      _logError('getOffices', e);
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> register(String name, String email, String password, int type, String officeId) async {
+    try {
+      // Validate input parameters
+      if (name.isEmpty || email.isEmpty || password.isEmpty || officeId.isEmpty) {
+        return {'success': false, 'message': 'All fields are required'};
+      }
+
+      // Log the request payload for debugging
+      final payload = {
+        'name': name,
+        'email': email,
+        'password': password,
+        'password_confirmation': password,
+        'type': type,
+        'office_id': officeId,
+      };
+      _logError('register', 'Sending request with payload: $payload');
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: _headers,
+        body: json.encode(payload),
+      );
+
+      // Log the response for debugging
+      _logError('register', 'Response status: ${response.statusCode}, body: ${response.body}');
+
+      if (response.statusCode != 201) {
+        // Handle validation errors specifically for registration
+        if (response.statusCode == 422) {
+          try {
+            final responseBody = json.decode(response.body);
+            if (responseBody.containsKey('errors')) {
+              final errors = responseBody['errors'] as Map;
+              
+              // Check specifically for email validation errors
+              if (errors.containsKey('email')) {
+                final emailErrors = errors['email'] as List;
+                if (emailErrors.isNotEmpty) {
+                  // If there's a specific email error, prioritize showing it clearly
+                  return {'success': false, 'message': 'Email error: ${emailErrors.join(', ')}'};
+                }
+              }
+              
+              // Return all validation errors
+              return {'success': false, 'message': 'Validation failed', 'errors': errors};
+            }
+          } catch (e) {
+            _logError('register', 'Error parsing validation errors: $e');
+          }
+        }
+        
+        // Use the general error handler for other error types
+        return _handleErrorResponse(response);
+      }
+
+      // Parse successful response
+      final responseData = json.decode(response.body);
+      return {
+        'success': true,
+        'message': responseData['message'] ?? 'Registration successful',
+        'data': responseData
+      };
+    } catch (e) {
+      _logError('register', e);
+      return {'success': false, 'message': 'Registration failed: ${e.toString()}'};
     }
   }
 
@@ -214,6 +394,7 @@ class AuthService {
     try {
       final token = await _getToken();
       if (token == null) return {'success': false, 'message': 'Not authenticated'};
+
 
       final response = await http.get(
         Uri.parse('$baseUrl/profile'),

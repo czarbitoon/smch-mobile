@@ -22,10 +22,10 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
 
   final List<String> _statusOptions = ['active', 'inactive', 'maintenance'];
 
-  String? _filterStatus = null;
-  String? _filterOffice = null;r
-  String? _filterType = null;
-  final Set<String> _deviceTypes = {};
+  String? _filterStatus;
+  String? _filterOffice;
+  String? _filterType;
+  Set<String> _deviceTypes = {};
 
   Future<void> _deleteDevice(int deviceId) async {
     try {
@@ -87,6 +87,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     super.initState();
     Future.microtask(() {
       context.read<DeviceProvider>().loadDevices();
+      context.read<DeviceProvider>().loadDeviceTypes();
       context.read<OfficeProvider>().loadOffices();
     });
   }
@@ -101,6 +102,8 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final deviceProvider = context.watch<DeviceProvider>();
+    _deviceTypes = deviceProvider.deviceTypes.map((type) => type['name'].toString()).toSet();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Device Management'),

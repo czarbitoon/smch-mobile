@@ -19,11 +19,14 @@ class ApiService {
 
   Future<Map<String, dynamic>> get(String endpoint, {Map<String, String>? queryParams}) async {
     try {
-      final token = await _getToken();
       final uri = Uri.parse('$baseUrl${endpoint.startsWith('/') ? endpoint : '/$endpoint'}').replace(queryParameters: queryParams);
+      
+      // Use appropriate headers based on whether the endpoint is protected or not
+      final requestHeaders = _isUnprotectedEndpoint(endpoint) ? headers : await _getHeaders();
+      
       final response = await http.get(
         uri,
-        headers: await _getHeaders(),
+        headers: requestHeaders,
       );
       return _handleResponse(response);
     } on FormatException catch (e) {
@@ -119,6 +122,23 @@ class ApiService {
       ...headers,
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  }
+  
+  // Check if endpoint is unprotected and doesn't require authentication
+  bool _isUnprotectedEndpoint(String endpoint) {
+    // List of endpoints that don't require authentication
+    final unprotectedEndpoints = [
+      'offices',
+      'device-categories',
+      'device-categories/',
+      'device-types/'
+    ];
+    
+    // Normalize the endpoint by removing leading slash
+    final normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    
+    // Check if the endpoint is in the unprotected list or starts with any of the unprotected prefixes
+    return unprotectedEndpoints.any((e) => normalizedEndpoint == e || normalizedEndpoint.startsWith(e));
   }
 
   void _logError(String method, dynamic error) {

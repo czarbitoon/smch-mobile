@@ -13,6 +13,9 @@ class StaffDashboard extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Staff Dashboard'),
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -25,27 +28,37 @@ class StaffDashboard extends StatelessWidget {
           children: [
             DrawerHeader(
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
+                color: Theme.of(context).colorScheme.primary,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 30,
-                    child: Icon(Icons.person, size: 30),
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    child: Icon(Icons.person,
+                        size: 30,
+                        color: Theme.of(context).colorScheme.onSecondary),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     authProvider.user?.name ?? 'Staff',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
                       fontSize: 18,
                     ),
                   ),
                   Text(
                     authProvider.user?.email ?? '',
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
                       fontSize: 14,
                     ),
                   ),
@@ -67,6 +80,48 @@ class StaffDashboard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+      body: GridView.count(
+        crossAxisCount: 2,
+        padding: const EdgeInsets.all(16.0),
+        mainAxisSpacing: 16.0,
+        crossAxisSpacing: 16.0,
+        children: [
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DeviceManagementScreen(),
+                  ),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.devices,
+                      size: 48.0,
+                      color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(height: 16.0),
+                  Text('Device Management',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      )),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

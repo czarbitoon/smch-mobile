@@ -13,49 +13,97 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+  bool _isRegistering = false;
   String? _errorMessage;
+  List<Map<String, dynamic>> _offices = [];
+  String? _selectedOfficeId;
+  int _selectedUserType = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOffices();
+  }
+
+  Future<void> _loadOffices() async {
+    final offices = await context.read<AuthProvider>().getOffices();
+    setState(() {
+      _offices = offices;
+    });
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    print('[LoginScreen] Handling login attempt');
+  Future<void> _handleSubmit() async {
+    print('[LoginScreen] Handling ${_isRegistering ? 'registration' : 'login'} attempt');
     setState(() {
       _errorMessage = null; // Clear any previous error messages
     });
 
     if (_formKey.currentState?.validate() ?? false) {
       print('[LoginScreen] Form validation passed');
-      print('[LoginScreen] Attempting login with email: ${_emailController.text}');
+      
+      if (_isRegistering) {
+        if (_passwordController.text != _confirmPasswordController.text) {
+          setState(() {
+            _errorMessage = 'Passwords do not match';
+          });
+          return;
+        }
 
-      final result = await context.read<AuthProvider>().login(
-        _emailController.text,
-        _passwordController.text,
-      );
+        final result = await context.read<AuthProvider>().register(
+          _nameController.text,
+          _emailController.text,
+          _passwordController.text,
+          _selectedUserType,
+          _selectedOfficeId ?? '',
+        );
 
-      print('[LoginScreen] Login result: $result');
+        print('[LoginScreen] Registration result: $result');
 
-      if (!mounted) {
-        print('[LoginScreen] Widget not mounted after login attempt');
-        return;
-      }
+        if (!mounted) return;
 
-      if (result['success']) {
-        print('[LoginScreen] Login successful, navigating to home screen');
-        Navigator.of(context).pushReplacementNamed('/home');
+        if (result['success']) {
+          print('[LoginScreen] Registration successful');
+          setState(() {
+            _isRegistering = false;
+            _errorMessage = null;
+          });
+        } else {
+          setState(() {
+            _errorMessage = result['message'];
+          });
+        }
       } else {
-        print('[LoginScreen] Login failed: ${result['message']}');
-        setState(() {
-          _errorMessage = result['message'];
-        });
+        final result = await context.read<AuthProvider>().login(
+          _emailController.text,
+          _passwordController.text,
+        );
+
+        print('[LoginScreen] Login result: $result');
+
+        if (!mounted) return;
+
+        if (result['success']) {
+          print('[LoginScreen] Login successful, navigating to home screen');
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          setState(() {
+            _errorMessage = result['message'];
+          });
+        }
       }
-    } else {
-      print('[LoginScreen] Form validation failed');
     }
   }
 
@@ -109,6 +157,74 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+                  if (_isRegistering) ...[                    
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        labelText: 'Full Name',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedOfficeId,
+                      decoration: InputDecoration(
+                        labelText: 'Office',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.business, color: Theme.of(context).colorScheme.primary),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ),
+                      items: _offices.map((office) => DropdownMenuItem(
+                        value: office['id'].toString(),
+                        child: Text(office['name']),
+                      )).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedOfficeId = value;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select an office';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<int>(
+                      value: _selectedUserType,
+                      decoration: InputDecoration(
+                        labelText: 'Role',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.work, color: Theme.of(context).colorScheme.primary),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 0, child: Text('User')),
+                        DropdownMenuItem(value: 1, child: Text('Staff')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedUserType = value ?? 0;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -123,6 +239,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
+                      }
+                      if (!value.contains('@')) {
+                        return 'Please enter a valid email';
                       }
                       return null;
                     },
@@ -154,9 +273,47 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password';
                       }
+                      if (_isRegistering && value.length < 8) {
+                        return 'Password must be at least 8 characters';
+                      }
                       return null;
                     },
                   ),
+                  if (_isRegistering) ...[                    
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: !_isConfirmPasswordVisible,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.lock, color: Theme.of(context).colorScheme.primary),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please confirm your password';
+                        }
+                        if (value != _passwordController.text) {
+                          return 'Passwords do not match';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                   if (_errorMessage != null) ...[                    
                     const SizedBox(height: 16),
                     Text(
@@ -169,7 +326,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ElevatedButton(
                     onPressed: context.watch<AuthProvider>().isLoading
                         ? null
-                        : _handleLogin,
+                        : _handleSubmit,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: Theme.of(context).colorScheme.primary,
@@ -187,10 +344,34 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           )
-                        : const Text(
-                            'Login',
-                            style: TextStyle(fontSize: 16),
+                        : Text(
+                            _isRegistering ? 'Register' : 'Login',
+                            style: const TextStyle(fontSize: 16),
                           ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      if (_isRegistering) {
+                        // Switch back to login
+                        setState(() {
+                          _isRegistering = false;
+                          _errorMessage = null;
+                          _formKey.currentState?.reset();
+                        });
+                      } else {
+                        // Navigate to register screen
+                        Navigator.of(context).pushNamed('/register');
+                      }
+                    },
+                    child: Text(
+                      _isRegistering
+                          ? 'Already have an account? Login'
+                          : 'Don\'t have an account? Register',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                   ),
                 ],
               ),

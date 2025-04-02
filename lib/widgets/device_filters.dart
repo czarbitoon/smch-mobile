@@ -59,13 +59,18 @@ class DeviceFilters extends StatelessWidget {
                       }),
                     ],
                     onChanged: onStatusChanged,
+                    dropdownColor: Theme.of(context).colorScheme.surface,
+                    iconSize: 24,
+                    isExpanded: true,
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Consumer<OfficeProvider>(
                     builder: (context, officeProvider, child) {
-                      return DropdownButtonFormField<String?>(
+                      return InkWell(
+                      onTap: () {},
+                      child: DropdownButtonFormField<String?>(
                         value: filterOffice,
                         decoration: const InputDecoration(
                           labelText: 'Office',
@@ -84,17 +89,21 @@ class DeviceFilters extends StatelessWidget {
                           }),
                         ],
                         onChanged: onOfficeChanged,
-                      );
+                        dropdownColor: Theme.of(context).colorScheme.surface,
+                        iconSize: 24,
+                        isExpanded: true,
+                      ),
+                    );
                     },
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String?>(  // Changed to String?
+            DropdownButtonFormField<String?>(
               value: filterType,
               decoration: const InputDecoration(
-                labelText: 'Type',
+                labelText: 'Device Type',
                 isDense: true,
               ),
               items: [
@@ -110,6 +119,9 @@ class DeviceFilters extends StatelessWidget {
                 }),
               ],
               onChanged: onTypeChanged,
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              iconSize: 24,
+              isExpanded: true,
             ),
           ],
         ),
