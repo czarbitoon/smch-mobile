@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'device_management_screen.dart';
+import 'reports_screen.dart';
 
 class StaffDashboard extends StatelessWidget {
   const StaffDashboard({super.key});
@@ -74,6 +75,19 @@ class StaffDashboard extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const DeviceManagementScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('Reports'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ReportsScreen(),
                   ),
                 );
               },

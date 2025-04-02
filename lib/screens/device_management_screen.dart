@@ -5,6 +5,7 @@ import '../providers/office_provider.dart';
 import '../widgets/device_filters.dart';
 import '../widgets/device_card.dart';
 import '../widgets/common/state_widgets.dart';
+import 'device_report_screen.dart';
 
 class DeviceManagementScreen extends StatefulWidget {
   const DeviceManagementScreen({super.key});
@@ -242,72 +243,106 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                         itemCount: deviceProvider.devices.length,
                         itemBuilder: (context, index) {
                           final device = deviceProvider.devices[index];
-                          return Card(
-                            elevation: 2,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          device['name'] ?? 'Unknown Device',
-                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                          overflow: TextOverflow.ellipsis,
+                          return InkWell(
+                            onTap: () {
+                              // Navigate to the device report screen when card is tapped
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DeviceReportScreen(
+                                    deviceId: device['id'],
+                                    deviceName: device['name'] ?? 'Unknown Device',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Card(
+                              elevation: 2,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            device['name'] ?? 'Unknown Device',
+                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
-                                      ),
-                                      PopupMenuButton<String>(
-                                        onSelected: (value) {
-                                          if (value == 'edit') {
-                                            _showDeviceDialog(device: device);
-                                          } else if (value == 'delete') {
-                                            _deleteDevice(device['id']);
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'edit',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.edit),
-                                                SizedBox(width: 8),
-                                                Text('Edit'),
-                                              ],
+                                        PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _showDeviceDialog(device: device);
+                                            } else if (value == 'delete') {
+                                              _deleteDevice(device['id']);
+                                            } else if (value == 'report') {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => DeviceReportScreen(
+                                                    deviceId: device['id'],
+                                                    deviceName: device['name'] ?? 'Unknown Device',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          itemBuilder: (context) => [
+                                            const PopupMenuItem(
+                                              value: 'report',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.report_problem),
+                                                  SizedBox(width: 8),
+                                                  Text('Report Issue'),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'delete',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.delete),
-                                                SizedBox(width: 8),
-                                                Text('Delete'),
-                                              ],
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.edit),
+                                                  SizedBox(width: 8),
+                                                  Text('Edit'),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Type: ${device['type'] ?? 'Unknown'}',
-                                    style: Theme.of(context).textTheme.bodyLarge,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Status: ${device['status'] ?? 'Unknown'}',
-                                    style: Theme.of(context).textTheme.bodyLarge,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Office: ${device['office'] ?? 'Unassigned'}',
-                                    style: Theme.of(context).textTheme.bodyLarge,
-                                  ),
-                                ],
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.delete),
+                                                  SizedBox(width: 8),
+                                                  Text('Delete'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Type: ${device['type'] ?? 'Unknown'}',
+                                      style: Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Status: ${device['status'] ?? 'Unknown'}',
+                                      style: Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Office: ${device['office'] ?? 'Unassigned'}',
+                                      style: Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );

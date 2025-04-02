@@ -22,6 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _profileImage;
   bool _isEditing = false;
   bool _isLoading = false;
+  Map<String, dynamic> profileData = {};
 
   @override
   void initState() {
@@ -64,10 +65,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       // Prepare profile data
-      final profileData = {
-        'name': _nameController.text,
-        'email': _emailController.text,
-      };
+      profileData['name'] = _nameController.text;
+      profileData['email'] = _emailController.text;
+      
+      // Note: office_id is added in the dropdown onChanged handler
 
       // Update profile
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -218,24 +219,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 8),
                   const Divider(),
                   
-                  // Office Info (Read-only)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Office: ${user.officeName ?? 'Not assigned'}',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        Text('Role: ${_getUserRole(user.type)}',
-                            style: Theme.of(context).textTheme.titleMedium),
-                      ],
-                    ),
-                  ),
+                  // Office Info (Editable when in edit mode)
+                  _isEditing
+                      ? FutureBuilder<List<Map<String, dynamic>>>(
+                          future: Provider.of<AuthProvider>(context, listen: false).getOffices(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            
+                            final offices = snapshot.data ?? [];
+                            String? selectedOfficeId = user.officeId?.toString();
+                            
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButtonFormField<String>(
+                                  value: selectedOfficeId,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Office',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  hint: const Text('Select an office'),
+                                  items: [
+                                    const DropdownMenuItem<String>(
+                                      value: '',
+                                      child: Text('No Office'),
+                                    ),
+                                    ...offices.map((office) => DropdownMenuItem<String>(
+                                          value: office['id'].toString(),
+                                          child: Text(office['name']),
+                                        )),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedOfficeId = value;
+                                    });
+                                    // Add office_id to profile data
+                                    if (value != null && value.isNotEmpty) {
+                                      profileData['office_id'] = value;
+                                    } else {
+                                      profileData['office_id'] = null;
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                Text('Role: ${_getUserRole(user.type)}',
+                                    style: Theme.of(context).textTheme.titleMedium),
+                              ],
+                            );
+                          },
+                        )
+                      : Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Office: ${user.officeName ?? 'Not assigned'}',
+                                  style: Theme.of(context).textTheme.titleMedium),
+                              const SizedBox(height: 8),
+                              Text('Role: ${_getUserRole(user.type)}',
+                                  style: Theme.of(context).textTheme.titleMedium),
+                            ],
+                          ),
+                        ),
                   
                   if (_isEditing && _isLoading)
                     const Padding(

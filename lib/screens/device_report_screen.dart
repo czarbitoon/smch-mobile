@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/device_report_provider.dart';
+import '../providers/reports_provider.dart';
 
 class DeviceReportScreen extends StatefulWidget {
   final int deviceId;
@@ -23,8 +24,8 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
   String _selectedStatus = 'Pending';
   bool _isSubmitting = false;
 
-  final List<String> _priorityLevels = DeviceReportProvider.priorityLevels;
-  final List<String> _statusOptions = DeviceReportProvider.statusOptions;
+  final List<String> _priorityLevels = ReportsProvider.priorityLevels;
+  final List<String> _statusOptions = ReportsProvider.statusOptions;
 
   @override
   void dispose() {
@@ -40,7 +41,8 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
     try {
       final reportProvider = context.read<DeviceReportProvider>();
       final success = await reportProvider.submitReport(
-        deviceId: widget.deviceId.toString(),
+        deviceId: widget.deviceId,
+        title: 'Issue with ${widget.deviceName}',
         description: _descriptionController.text,
         priority: _selectedPriority,
         status: _selectedStatus,
@@ -78,6 +80,42 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Display device name as information
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.devices, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Device',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            widget.deviceName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _selectedPriority,
                 decoration: const InputDecoration(

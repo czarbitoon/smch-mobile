@@ -109,12 +109,18 @@ class ReportsProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> resolveReport(int reportId, String resolutionNotes) async {
+  Future<bool> resolveReport(int reportId, String resolutionNotes, {required bool isAdminOrStaff}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
+      // Check if user has permission to resolve reports
+      if (!isAdminOrStaff) {
+        _error = 'You do not have permission to resolve reports';
+        return false;
+      }
+      
       final response = await _apiService.post('/reports/$reportId/resolve', {
         'resolution_notes': resolutionNotes,
       });

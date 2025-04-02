@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'reports_screen.dart';
 import 'device_management_screen.dart';
-import 'office_management_screen.dart';
+
 
 class UserDashboard extends StatelessWidget {
   const UserDashboard({super.key});
@@ -122,19 +122,7 @@ class UserDashboard extends StatelessWidget {
                 );
               },
             ),
-            _buildDashboardCard(
-              context,
-              'Offices',
-              Icons.business,
-              () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OfficeManagementScreen(),
-                  ),
-                );
-              },
-            ),
+            
             _buildDashboardCard(
               context,
               'Reports',

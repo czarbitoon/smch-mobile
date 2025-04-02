@@ -266,6 +266,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         final success = await context.read<ReportsProvider>().resolveReport(
                               reportId,
                               resolutionController.text.trim(),
+                              isAdminOrStaff: context.read<AuthProvider>().isAdmin || context.read<AuthProvider>().isStaff,
                             );
 
                         if (!context.mounted) return;
