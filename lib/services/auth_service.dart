@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 import 'api_service.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:8000/api';
+  // Get base URL from AppConfig
+  static String get baseUrl => AppConfig.apiBaseUrl;
   final _storage = const FlutterSecureStorage();
   static const Map<String, String> _headers = {
     'Accept': 'application/json',

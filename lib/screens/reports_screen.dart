@@ -162,6 +162,53 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                         const Text('Device:', style: TextStyle(fontWeight: FontWeight.bold)),
                                         Text('${details['device']['name'] ?? 'N/A'}')
                                       ],
+                                      const SizedBox(height: 8),
+                                      // Display device image if available
+                                      if (details['device_image_url'] != null && details['device_image_url'].toString().isNotEmpty) ...[                                        
+                                        const Text('Device Image:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            details['device_image_url'],
+                                            height: 150,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => 
+                                              Container(
+                                                height: 100,
+                                                color: Colors.grey[300],
+                                                child: const Center(
+                                                  child: Text('Failed to load image'),
+                                                ),
+                                              ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                      ],
+                                      // Display report image if available
+                                      if (details['report_image'] != null && details['report_image'].toString().isNotEmpty) ...[                                        
+                                        const Text('Report Image:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Image.network(
+                                            '${context.read<AuthProvider>().apiBaseUrl}/storage/${details['report_image']}',
+                                            height: 150,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => 
+                                              Container(
+                                                height: 100,
+                                                color: Colors.grey[300],
+                                                child: const Center(
+                                                  child: Text('Failed to load image'),
+                                                ),
+                                              ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                      ],
                                       if (details['status'] != 'resolved' && (context.read<AuthProvider>().isAdmin || context.read<AuthProvider>().isStaff)) ...[                                        
                                         const SizedBox(height: 16),
                                         ElevatedButton(

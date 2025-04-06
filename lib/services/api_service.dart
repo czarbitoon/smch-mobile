@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../config/app_config.dart';
 
 class UnauthorizedException implements Exception {
   final String message;
@@ -10,7 +11,8 @@ class UnauthorizedException implements Exception {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8000/api';
+  // Get base URL from AppConfig
+  static String get baseUrl => AppConfig.apiBaseUrl;
   final _storage = const FlutterSecureStorage();
   static const Map<String, String> headers = {
     'Content-Type': 'application/json',
@@ -54,6 +56,40 @@ class ApiService {
       return _formatError();
     } catch (e) {
       _logError('POST', e);
+      return _connectionError();
+    }
+  }
+  
+  Future<Map<String, dynamic>> uploadWithImage(String endpoint, Map<String, dynamic> data, String imagePath, {String imageFieldName = 'report_image'}) async {
+    try {
+      final uri = Uri.parse('$baseUrl${endpoint.startsWith('/') ? endpoint : '/$endpoint'}');
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Add headers (excluding content-type as it's set by MultipartRequest)
+      final headers = await _getHeaders();
+      headers.remove('Content-Type'); // MultipartRequest sets this automatically
+      request.headers.addAll(headers);
+      
+      // Add text fields
+      data.forEach((key, value) {
+        if (value != null) {
+          request.fields[key] = value.toString();
+        }
+      });
+      
+      // Add image file if path is provided
+      if (imagePath.isNotEmpty) {
+        final file = await http.MultipartFile.fromPath(imageFieldName, imagePath);
+        request.files.add(file);
+      }
+      
+      // Send the request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      return _handleResponse(response);
+    } catch (e) {
+      _logError('UPLOAD', e);
       return _connectionError();
     }
   }

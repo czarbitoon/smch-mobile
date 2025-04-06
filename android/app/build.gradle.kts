@@ -4,7 +4,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-rootProject.rootDir = rootProject.projectDir.parentFile.parentFile
+val rootDir = rootProject.projectDir.parentFile.parentFile
 
 android {
     namespace = "com.example.smch_mobile"
@@ -42,4 +42,11 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Let the Flutter plugin handle the dependencies automatically
+    // This is the recommended approach for Flutter engine dependencies
+    implementation(kotlin("stdlib-jdk8"))
+    implementation("androidx.core:core-ktx:1.10.1")
 }

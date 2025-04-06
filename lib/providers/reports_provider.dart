@@ -188,6 +188,7 @@ class ReportsProvider extends ChangeNotifier {
     required String description,
     required String priority,
     required String status,
+    String? imagePath,
   }) async {
     _isLoading = true;
     _error = null;
@@ -225,7 +226,9 @@ class ReportsProvider extends ChangeNotifier {
       
       print('Submitting report with validated data: $reportData');
       
-      final response = await _apiService.post('/reports', reportData);
+      final response = imagePath != null && imagePath.isNotEmpty
+          ? await _apiService.uploadWithImage('/reports', reportData, imagePath)
+          : await _apiService.post('/reports', reportData);
       print('API Response: $response');
       
       if (response is Map<String, dynamic>) {

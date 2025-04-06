@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../providers/device_report_provider.dart';
 import '../providers/reports_provider.dart';
 
@@ -23,6 +25,8 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
   String _selectedPriority = 'Medium';
   String _selectedStatus = 'Pending';
   bool _isSubmitting = false;
+  File? _imageFile;
+  final _imagePicker = ImagePicker();
 
   final List<String> _priorityLevels = ReportsProvider.priorityLevels;
   final List<String> _statusOptions = ReportsProvider.statusOptions;
@@ -31,6 +35,27 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
   void dispose() {
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
+    }
   }
 
   Future<void> _submitReport() async {
@@ -46,6 +71,7 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
         description: _descriptionController.text,
         priority: _selectedPriority,
         status: _selectedStatus,
+        imagePath: _imageFile?.path,
       );
 
       if (!mounted) return;
@@ -168,6 +194,62 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              // Image preview and upload section
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Report Image (Optional)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_imageFile != null) ...[                      
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          _imageFile!,
+                          height: 200,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => setState(() => _imageFile = null),
+                        child: const Text('Remove Image'),
+                      ),
+                    ] else ...[                      
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _pickImage(ImageSource.camera),
+                            icon: const Icon(Icons.camera_alt),
+                            label: const Text('Take Photo'),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () => _pickImage(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library),
+                            label: const Text('Gallery'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
