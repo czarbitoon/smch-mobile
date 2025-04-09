@@ -9,6 +9,8 @@ class AuthProvider extends BaseProvider {
   final AuthService _authService = AuthService();
   Map<String, dynamic>? _userData;
   UserModel? _user;
+  
+  String get apiBaseUrl => _authService.baseUrl;
 
   bool get isAuthenticated => _userData != null;
   Map<String, dynamic>? get userData => _userData;

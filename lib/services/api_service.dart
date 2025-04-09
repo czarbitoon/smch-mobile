@@ -1,7 +1,15 @@
-import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:retry/retry.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../utils/cache_manager.dart';
 import '../config/app_config.dart';
+
+final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
 class UnauthorizedException implements Exception {
   final String message;
@@ -11,9 +19,211 @@ class UnauthorizedException implements Exception {
 }
 
 class ApiService {
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService() => _instance;
+  ApiService._internal();
+
+  late final Dio _dio;
+  final _storage = const FlutterSecureStorage();
+  final _cacheManager = CacheManager();
+  final _connectivity = Connectivity();
+  final _requestQueue = <Future Function()>[];
+  Timer? _batchTimer;
+  bool _isProcessingQueue = false;
+  bool _isOnline = true;
+
+  Future<void> initialize() async {
+    _dio = Dio(BaseOptions(
+      baseUrl: const String.fromEnvironment('API_URL'),
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {'Accept': 'application/json'},
+    ));
+
+    // Add interceptors
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: _onRequest,
+        onResponse: _onResponse,
+        onError: _onError,
+      ),
+    );
+
+    // Initialize cache and check connectivity
+    await _cacheManager.initialize();
+    _isOnline = await _checkConnectivity();
+    _setupConnectivityListener();
+  }
+
+  Future<bool> _checkConnectivity() async {
+    final result = await _connectivity.checkConnectivity();
+    return result != ConnectivityResult.none;
+  }
+
+  void _setupConnectivityListener() {
+    _connectivity.onConnectivityChanged.listen((result) {
+      _isOnline = result != ConnectivityResult.none;
+      if (_isOnline) {
+        _processPendingRequests();
+      }
+    });
+  }
+
+  Future<void> _processPendingRequests() async {
+    final pendingActions = await _cacheManager.getPendingActions();
+    for (final action in pendingActions) {
+      try {
+        switch (action['method']) {
+          case 'POST':
+            await post(
+              action['endpoint'],
+              json.decode(action['data']),
+              skipOfflineQueue: true,
+            );
+            break;
+          case 'PUT':
+            await put(
+              action['endpoint'],
+              json.decode(action['data']),
+              skipOfflineQueue: true,
+            );
+            break;
+          case 'DELETE':
+            await delete(
+              action['endpoint'],
+              skipOfflineQueue: true,
+            );
+            break;
+        }
+      } catch (e) {
+        debugPrint('Error processing pending request: $e');
+      }
+    }
+  }
+
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    bool forceRefresh = false,
+    Duration? maxAge,
+  }) async {
+    if (!_isOnline) {
+      final cachedData = await _cacheManager.get<T>(path);
+      if (cachedData != null) {
+        return Response(
+          requestOptions: RequestOptions(path: path),
+          data: cachedData,
+          statusCode: 200,
+        );
+      }
+      throw DioException(
+        requestOptions: RequestOptions(path: path),
+        error: 'No internet connection and no cached data available',
+      );
+    }
+
+    try {
+      final response = await _dio.get<T>(
+        path,
+        queryParameters: queryParameters,
+        options: options,
+      );
+      await _cacheManager.set(path, response.data, maxAge: maxAge);
+      return response;
+    } catch (e) {
+      final cachedData = await _cacheManager.get<T>(path);
+      if (cachedData != null) {
+        return Response(
+          requestOptions: RequestOptions(path: path),
+          data: cachedData,
+          statusCode: 200,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<Response> post(
+    String path,
+    dynamic data, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    bool skipOfflineQueue = false,
+  }) async {
+    if (!_isOnline && !skipOfflineQueue) {
+      await _cacheManager.savePendingAction('POST', path, data);
+      return Response(
+        requestOptions: RequestOptions(path: path),
+        data: {'message': 'Request queued for offline processing'},
+        statusCode: 202,
+      );
+    }
+
+    return _dio.post(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+    );
+  }
+
+  Future<Response> put(
+    String path,
+    dynamic data, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    bool skipOfflineQueue = false,
+  }) async {
+    if (!_isOnline && !skipOfflineQueue) {
+      await _cacheManager.savePendingAction('PUT', path, data);
+      return Response(
+        requestOptions: RequestOptions(path: path),
+        data: {'message': 'Request queued for offline processing'},
+        statusCode: 202,
+      );
+    }
+
+    return _dio.put(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: options,
+    );
+  }
+
+  Future<Response> delete(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    bool skipOfflineQueue = false,
+  }) async {
+    if (!_isOnline && !skipOfflineQueue) {
+      await _cacheManager.savePendingAction('DELETE', path, null);
+      return Response(
+        requestOptions: RequestOptions(path: path),
+        data: {'message': 'Request queued for offline processing'},
+        statusCode: 202,
+      );
+    }
+
+    return _dio.delete(
+      path,
+      queryParameters: queryParameters,
+      options: options,
+    );
+  }
+
+  Future<void> clearCache() => _cacheManager.clear();
+
+  void dispose() {
+    _batchTimer?.cancel();
+    _requestQueue.clear();
+    _cacheManager.dispose();
+  }
+
   // Get base URL from AppConfig
   static String get baseUrl => AppConfig.apiBaseUrl;
-  final _storage = const FlutterSecureStorage();
   static const Map<String, String> headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

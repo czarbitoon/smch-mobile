@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../widgets/theme_toggle.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
   static const routeName = '/profile';
@@ -19,9 +20,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  File? _profileImage;
-  bool _isEditing = false;
+  final _phoneController = TextEditingController();
+  final _imagePicker = ImagePicker();
+  File? _image;
   bool _isLoading = false;
+  bool _isEditing = false;
   Map<String, dynamic> profileData = {};
 
   @override
@@ -34,286 +37,282 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
   void _loadUserData() {
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     if (user != null) {
-      _nameController.text = user.name ?? '';
-      _emailController.text = user.email ?? '';
+      _nameController.text = user['name'] ?? '';
+      _emailController.text = user['email'] ?? '';
+      _phoneController.text = user['phone'] ?? '';
     }
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedImage = await picker.pickImage(source: ImageSource.gallery);
-    
-    if (pickedImage != null) {
-      setState(() {
-        _profileImage = File(pickedImage.path);
-      });
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      // Prepare profile data
-      profileData['name'] = _nameController.text;
-      profileData['email'] = _emailController.text;
-      
-      // Note: office_id is added in the dropdown onChanged handler
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
 
-      // Update profile
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final result = await authProvider.updateProfile(profileData, _profileImage);
-
-      if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully')),
-        );
+      if (pickedFile != null) {
         setState(() {
-          _isEditing = false;
+          _image = File(pickedFile.path);
         });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Failed to update profile')),
-        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
+    }
+  }
+
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+
+      if (user == null) {
+        throw Exception('User not found');
+      }
+
+      final updatedUser = {
+        ...user,
+        'name': _nameController.text,
+        'email': _emailController.text,
+        'phone': _phoneController.text,
+        if (_image != null) 'image': _image,
+      };
+
+      await authProvider.updateProfile(updatedUser);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() => _isEditing = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating profile: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.user;
+
+    if (user == null) {
+      return const Center(child: Text('User not found'));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 2,
         actions: [
           if (!_isEditing)
             IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () {
-                setState(() {
-                  _isEditing = true;
-                });
-              },
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: _isLoading ? null : _saveProfile,
+              onPressed: () => setState(() => _isEditing = true),
+              tooltip: 'Edit Profile',
             ),
         ],
       ),
-      body: Consumer<AuthProvider>(
-        builder: (ctx, authProvider, _) {
-          final user = authProvider.user;
-          
-          if (user == null) {
-            return const Center(child: Text('User not found'));
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Profile Picture
-                  GestureDetector(
-                    onTap: _isEditing ? _pickImage : null,
-                    child: Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundImage: _profileImage != null
-                              ? FileImage(_profileImage!) as ImageProvider
-                              : (user.profilePicture != null
-                                  ? NetworkImage('http://localhost:8000/storage/${user.profilePicture}')
-                                  : const AssetImage('assets/logo.png')) as ImageProvider,
-                        ),
-                        if (_isEditing)
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                      ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundImage: _image != null
+                          ? FileImage(_image!)
+                          : user['image_url'] != null
+                              ? NetworkImage(user['image_url'])
+                              : null,
+                      child: _image == null && user['image_url'] == null
+                          ? const Icon(Icons.person, size: 60)
+                          : null,
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // User Info
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
-                    ),
-                    enabled: _isEditing,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Theme Toggle
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  const ThemeToggle(),
-                  const SizedBox(height: 8),
-                  const Divider(),
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(),
-                    ),
-                    enabled: _isEditing,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Theme Toggle
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  const ThemeToggle(),
-                  const SizedBox(height: 8),
-                  const Divider(),
-                  
-                  // Office Info (Editable when in edit mode)
-                  _isEditing
-                      ? FutureBuilder<List<Map<String, dynamic>>>(
-                          future: Provider.of<AuthProvider>(context, listen: false).getOffices(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                            
-                            final offices = snapshot.data ?? [];
-                            String? selectedOfficeId = user.officeId?.toString();
-                            
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                DropdownButtonFormField<String>(
-                                  value: selectedOfficeId,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Office',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  hint: const Text('Select an office'),
-                                  items: [
-                                    const DropdownMenuItem<String>(
-                                      value: '',
-                                      child: Text('No Office'),
-                                    ),
-                                    ...offices.map((office) => DropdownMenuItem<String>(
-                                          value: office['id'].toString(),
-                                          child: Text(office['name']),
-                                        )),
-                                  ],
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedOfficeId = value;
-                                    });
-                                    // Add office_id to profile data
-                                    if (value != null && value.isNotEmpty) {
-                                      profileData['office_id'] = value;
-                                    } else {
-                                      profileData['office_id'] = null;
-                                    }
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                Text('Role: ${_getUserRole(user.type)}',
-                                    style: Theme.of(context).textTheme.titleMedium),
-                              ],
-                            );
-                          },
-                        )
-                      : Container(
-                          padding: const EdgeInsets.all(16),
+                    if (_isEditing)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
-                            borderRadius: BorderRadius.circular(4),
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Office: ${user.officeName ?? 'Not assigned'}',
-                                  style: Theme.of(context).textTheme.titleMedium),
-                              const SizedBox(height: 8),
-                              Text('Role: ${_getUserRole(user.type)}',
-                                  style: Theme.of(context).textTheme.titleMedium),
-                            ],
+                          child: IconButton(
+                            icon: const Icon(Icons.camera_alt),
+                            onPressed: _pickImage,
+                            color: theme.colorScheme.onPrimary,
                           ),
                         ),
-                  
-                  if (_isEditing && _isLoading)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 20.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                ],
+                      ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                enabled: _isEditing,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                enabled: _isEditing,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your email';
+                  }
+                  if (!value.contains('@')) {
+                    return 'Please enter a valid email';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneController,
+                decoration: InputDecoration(
+                  labelText: 'Phone',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                enabled: _isEditing,
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 24),
+              if (_isEditing) ...[
+                FilledButton(
+                  onPressed: _isLoading ? null : _updateProfile,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text('Save Changes'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = false;
+                      _loadUserData();
+                      _image = null;
+                    });
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+              const SizedBox(height: 24),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Account Information',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      ListTile(
+                        leading: const Icon(Icons.person_outline),
+                        title: const Text('Role'),
+                        subtitle: Text(user['role'] ?? 'User'),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today),
+                        title: const Text('Member Since'),
+                        subtitle: Text(
+                          user['created_at'] != null
+                              ? DateFormat('MMM d, y').format(
+                                  DateTime.parse(user['created_at']))
+                              : 'Unknown',
+                        ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.security),
+                        title: const Text('Last Login'),
+                        subtitle: Text(
+                          user['last_login'] != null
+                              ? DateFormat('MMM d, y h:mm a').format(
+                                  DateTime.parse(user['last_login']))
+                              : 'Unknown',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
-  }
-  
-  String _getUserRole(int? type) {
-    switch (type) {
-      case 0:
-        return 'User';
-      case 1:
-        return 'Staff';
-      case 2:
-        return 'Admin';
-      case 3:
-        return 'Super Admin';
-      default:
-        return 'Unknown';
-    }
   }
 }

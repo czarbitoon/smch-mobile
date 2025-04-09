@@ -268,6 +268,39 @@ class DeviceProvider extends BaseProvider {
     );
   }
 
+  Future<bool> uploadDeviceImage(int deviceId, String imagePath) async {
+    return await handleAsync(
+      () async {
+        final result = await _deviceService.uploadDeviceImage(deviceId, imagePath);
+        if (result['success']) {
+          final index = _devices.indexWhere((device) => device['id'] == deviceId);
+          if (index != -1) {
+            _devices[index]['image_url'] = result['data']['image_url'];
+            notifyListeners();
+          }
+          return true;
+        } else {
+          throw Exception(result['message']);
+        }
+      },
+      errorMessage: 'Failed to upload device image',
+    );
+  }
+
+  Future<String?> getDeviceImageUrl(int deviceId) async {
+    return await handleAsync(
+      () async {
+        final result = await _deviceService.getDeviceImage(deviceId);
+        if (result['success']) {
+          return result['data']['image_url'];
+        } else {
+          throw Exception(result['message']);
+        }
+      },
+      errorMessage: 'Failed to get device image',
+    );
+  }
+
   bool _isLoading = false;
   String? _error;
 

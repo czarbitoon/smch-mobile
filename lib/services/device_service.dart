@@ -80,6 +80,28 @@ class DeviceService {
     }
   }
 
+  Future<Map<String, dynamic>> uploadDeviceImage(int deviceId, String imagePath) async {
+    try {
+      final response = await _apiService.uploadFile(
+        'devices/$deviceId/image',
+        imagePath,
+        'image',
+      );
+      return _processResponse(response, 'upload image');
+    } catch (e, stackTrace) {
+      return _handleError(e, stackTrace, 'Failed to upload device image');
+    }
+  }
+
+  Future<Map<String, dynamic>> getDeviceImage(int deviceId) async {
+    try {
+      final response = await _apiService.get('devices/$deviceId/image');
+      return _processResponse(response, 'get device image');
+    } catch (e, stackTrace) {
+      return _handleError(e, stackTrace, 'Failed to get device image');
+    }
+  }
+
   Future<Map<String, dynamic>> _handleApiCall(Future<Map<String, dynamic>> Function() apiCall, String action) async {
     try {
       final response = await apiCall();

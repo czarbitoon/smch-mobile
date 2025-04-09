@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:smch_mobile/providers/device_provider.dart';
+import 'package:smch_mobile/providers/auth_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../providers/device_report_provider.dart';
-import '../providers/reports_provider.dart';
+import 'package:intl/intl.dart';
 
 class DeviceReportScreen extends StatefulWidget {
   final int deviceId;
   final String deviceName;
 
   const DeviceReportScreen({
-    Key? key,
+    super.key,
     required this.deviceId,
     required this.deviceName,
-  }) : super(key: key);
+  });
 
   @override
   State<DeviceReportScreen> createState() => _DeviceReportScreenState();
@@ -22,14 +23,20 @@ class DeviceReportScreen extends StatefulWidget {
 class _DeviceReportScreenState extends State<DeviceReportScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
-  String _selectedPriority = 'Medium';
-  String _selectedStatus = 'Pending';
-  bool _isSubmitting = false;
-  File? _imageFile;
   final _imagePicker = ImagePicker();
+  File? _image;
+  bool _isLoading = false;
+  String? _selectedPriority;
+  String? _selectedCategory;
 
-  final List<String> _priorityLevels = ReportsProvider.priorityLevels;
-  final List<String> _statusOptions = ReportsProvider.statusOptions;
+  final List<String> _priorities = ['Low', 'Medium', 'High', 'Critical'];
+  final List<String> _categories = [
+    'Hardware Issue',
+    'Software Issue',
+    'Network Issue',
+    'Performance Issue',
+    'Other'
+  ];
 
   @override
   void dispose() {
@@ -37,23 +44,26 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _pickImage() async {
     try {
       final pickedFile = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 1200,
-        maxHeight: 1200,
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
         imageQuality: 85,
       );
-      
+
       if (pickedFile != null) {
         setState(() {
-          _imageFile = File(pickedFile.path);
+          _image = File(pickedFile.path);
         });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
       );
     }
   }
@@ -61,131 +71,170 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
   Future<void> _submitReport() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isLoading = true);
 
     try {
-      final reportProvider = context.read<DeviceReportProvider>();
-      final success = await reportProvider.submitReport(
-        deviceId: widget.deviceId,
-        title: 'Issue with ${widget.deviceName}',
-        description: _descriptionController.text,
-        priority: _selectedPriority,
-        status: _selectedStatus,
-        imagePath: _imageFile?.path,
-      );
+      final deviceProvider = context.read<DeviceProvider>();
+      final authProvider = context.read<AuthProvider>();
 
-      if (!mounted) return;
+      final report = {
+        'device_id': widget.deviceId,
+        'description': _descriptionController.text,
+        'priority': _selectedPriority,
+        'category': _selectedCategory,
+        'reported_by': authProvider.user?['id'],
+        'image': _image,
+      };
 
-      if (success) {
+      await deviceProvider.submitReport(report);
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Report submitted successfully')),
+          const SnackBar(
+            content: Text('Report submitted successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
-        Navigator.of(context).pop();
-      } else {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(reportProvider.error ?? 'Failed to submit report')),
+          SnackBar(
+            content: Text('Error submitting report: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final deviceProvider = context.watch<DeviceProvider>();
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Report ${widget.deviceName}'),
+        title: Text('Report Issue: ${widget.deviceName}'),
+        centerTitle: true,
+        elevation: 0,
+        scrolledUnderElevation: 2,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Display device name as information
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.devices, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Device',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          Text(
-                            widget.deviceName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Device Information',
+                        style: theme.textTheme.titleMedium,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      FutureBuilder(
+                        future: deviceProvider.getDeviceDetails(widget.deviceId),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+
+                          if (snapshot.hasError) {
+                            return Text(
+                              'Error loading device details: ${snapshot.error}',
+                              style: TextStyle(color: theme.colorScheme.error),
+                            );
+                          }
+
+                          final device = snapshot.data;
+                          if (device == null) {
+                            return const Text('Device not found');
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Type: ${device['type']}'),
+                              Text('Status: ${device['status']}'),
+                              Text('Office: ${device['office']}'),
+                              if (device['last_maintenance'] != null)
+                                Text(
+                                  'Last Maintenance: ${DateFormat('MMM d, y').format(DateTime.parse(device['last_maintenance']))}',
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedPriority,
-                decoration: const InputDecoration(
-                  labelText: 'Priority',
-                  border: OutlineInputBorder(),
+                value: _selectedCategory,
+                decoration: InputDecoration(
+                  labelText: 'Issue Category',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                items: _priorityLevels.map((priority) {
-                  return DropdownMenuItem(
-                    value: priority,
-                    child: Text(priority),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedPriority = value);
+                items: _categories
+                    .map((category) => DropdownMenuItem(
+                          value: category,
+                          child: Text(category),
+                        ))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedCategory = value),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a category';
                   }
+                  return null;
                 },
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedStatus,
-                decoration: const InputDecoration(
-                  labelText: 'Status',
-                  border: OutlineInputBorder(),
+                value: _selectedPriority,
+                decoration: InputDecoration(
+                  labelText: 'Priority',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                items: _statusOptions.map((status) {
-                  return DropdownMenuItem(
-                    value: status,
-                    child: Text(status),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedStatus = value);
+                items: _priorities
+                    .map((priority) => DropdownMenuItem(
+                          value: priority,
+                          child: Text(priority),
+                        ))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedPriority = value),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a priority';
                   }
+                  return null;
                 },
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Description',
-                  hintText: 'Describe the issue with the device',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignLabelWithHint: true,
                 ),
                 maxLines: 5,
                 validator: (value) {
@@ -196,66 +245,49 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              // Image preview and upload section
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              if (_image != null)
+                Stack(
                   children: [
-                    Text(
-                      'Report Image (Optional)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        _image!,
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    if (_imageFile != null) ...[                      
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          _imageFile!,
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() => _image = null),
+                        style: IconButton.styleFrom(
+                          backgroundColor: theme.colorScheme.surface,
+                          foregroundColor: theme.colorScheme.error,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => setState(() => _imageFile = null),
-                        child: const Text('Remove Image'),
-                      ),
-                    ] else ...[                      
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _pickImage(ImageSource.camera),
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('Take Photo'),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () => _pickImage(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('Gallery'),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ],
                 ),
-              ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitReport,
-                child: _isSubmitting
-                    ? const CircularProgressIndicator()
+              FilledButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.add_photo_alternate),
+                label: const Text('Add Image'),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _isLoading ? null : _submitReport,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Text('Submit Report'),
               ),
             ],

@@ -6,7 +6,7 @@ import 'api_service.dart';
 
 class AuthService {
   // Get base URL from AppConfig
-  static String get baseUrl => AppConfig.apiBaseUrl;
+  String get baseUrl => AppConfig.apiBaseUrl;
   final _storage = const FlutterSecureStorage();
   static const Map<String, String> _headers = {
     'Accept': 'application/json',
