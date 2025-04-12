@@ -1,342 +1,256 @@
 import 'package:flutter/material.dart';
 import '../services/device_service.dart';
-import 'base_provider.dart';
+import '../models/device_model.dart';
 
-class DeviceProvider extends BaseProvider {
-  final DeviceService _deviceService = DeviceService();
-  List<Map<String, dynamic>> _devices = [];
+class DeviceProvider extends ChangeNotifier {
+  final DeviceService _deviceService;
+  List<DeviceModel> _devices = [];
   List<Map<String, dynamic>> _deviceTypes = [];
   int _currentPage = 1;
   int _lastPage = 1;
   int _perPage = 10;
   int _total = 0;
+  DeviceModel? _currentDevice;
+  bool _isLoading = false;
+  String? _error;
+  Map<String, dynamic>? _filters;
 
-  List<Map<String, dynamic>> get devices => _devices;
+  DeviceProvider(this._deviceService);
+
+  List<DeviceModel> get devices => _devices;
   List<Map<String, dynamic>> get deviceTypes => _deviceTypes;
   int get currentPage => _currentPage;
   int get lastPage => _lastPage;
   int get total => _total;
-
-  static const _cacheTimeout = Duration(hours: 24);
-  DateTime? _lastFetchTime;
-
-  Future<void> loadDevices({int? page}) async {
-    // Return cached data if within timeout
-    if (_lastFetchTime != null && 
-        DateTime.now().difference(_lastFetchTime!) < _cacheTimeout &&
-        _devices.isNotEmpty) {
-      return;
-    }
-
-    await handleAsync(
-      () async {
-        final result = await _deviceService.getDevices(page: page ?? _currentPage);
-        
-        if (result['status'] == 401) {
-          _devices = [];
-          throw Exception(result['message']);
-        }
-
-        if (result['success'] == true && result['data'] != null) {
-          final data = result['data'] as Map<String, dynamic>;
-          final devicesData = data['devices'] as List? ?? [];
-          _devices = devicesData.map((device) {
-            final deviceMap = Map<String, dynamic>.from(device);
-            
-            // Unified type conversion
-            final convertField = (dynamic value) => value is int 
-                ? value 
-                : int.tryParse(value.toString()) ?? 0;
-
-            deviceMap['id'] = convertField(deviceMap['id']);
-            deviceMap['office_id'] = deviceMap['office_id'] != null 
-                ? convertField(deviceMap['office_id']) 
-                : null;
-            deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
-            deviceMap['type'] = deviceMap['type']?['name'] ?? deviceMap['device_subcategory']?['device_type']?['name'] ?? 'Unknown';
-            deviceMap['category'] = deviceMap['category']?['name'] ?? 
-                deviceMap['device_subcategory']?['device_type']?['device_category']?['name'] ?? 
-                'Unknown';
-            deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
-                ? convertField(deviceMap['subcategory_id'])
-                : null;
-            deviceMap['type_id'] = deviceMap['device_subcategory']?['device_type']?['id'] != null
-                ? convertField(deviceMap['device_subcategory']['device_type']['id'])
-                : null;
-
-            return deviceMap;
-          }).where((d) => d['id'] != 0).toList(); // Filter invalid entries
-          
-          final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
-          _currentPage = int.tryParse(pagination['current_page']?.toString() ?? '1') ?? 1;
-          _lastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
-          _total = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
-          _perPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
-
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to load devices',
-    );
-  }
-
-  Future<void> loadDeviceTypes() async {
-    await handleAsync(
-      () async {
-        final result = await _deviceService.getDeviceTypes();
-        if (result['status'] == 401) {
-          _deviceTypes = [];
-          throw Exception(result['message']);
-        }
-        
-        if (result['success'] && result['data'] != null) {
-          final types = result['data'] as List? ?? [];
-          
-          _deviceTypes = types.map((type) {
-            if (type is Map) {
-              final typeMap = Map<String, dynamic>.from(type);
-              
-              // Unified type conversion
-              final convertField = (dynamic value) => value is int 
-                  ? value 
-                  : int.tryParse(value.toString()) ?? 0;
-              
-              final id = typeMap['id'] != null 
-                  ? convertField(typeMap['id']) 
-                  : 0;
-              final name = typeMap['name']?.toString() ?? 'Unknown';
-              
-              return {
-                'id': id, 
-                'name': name
-              };
-            }
-            return {'id': 0, 'name': 'Unknown'};
-          }).where((type) => type['id'] != 0).toList(); // Filter invalid entries
-          
-          _lastFetchTime = DateTime.now();
-          notifyListeners();
-        } else {
-          throw Exception(result['message'] ?? 'Failed to load device types');
-        }
-      },
-      errorMessage: 'Failed to load device types'
-    );
-  }
-
-  Map<String, dynamic> _processTypeFilter(Map<String, dynamic> filters) {
-    final processedFilters = Map<String, dynamic>.from(filters);
-    
-    if (processedFilters.containsKey('type') && processedFilters['type'] != null) {
-      final typeName = processedFilters['type'].toString().trim();
-      if (typeName.isNotEmpty) {
-        final typeEntry = _deviceTypes.firstWhere(
-          (type) => type['name'].toString().toLowerCase() == typeName.toLowerCase(),
-          orElse: () => {'id': 0, 'name': 'Unknown'} as Map<String, Object>
-        );
-        
-        if (typeEntry['id'] != 0) {
-          processedFilters['type_id'] = typeEntry['id'].toString();
-        }
-      }
-      // Remove the type field as we've processed it into type_id
-      processedFilters.remove('type');
-    }
-    
-    return processedFilters;
-  }
-
-  Map<String, dynamic> _transformDeviceData(dynamic device) {
-    final deviceMap = Map<String, dynamic>.from(device);
-    
-    final convertField = (dynamic value) => value is int 
-        ? value 
-        : int.tryParse(value.toString()) ?? 0;
-
-    deviceMap['id'] = convertField(deviceMap['id']);
-    deviceMap['office_id'] = deviceMap['office_id'] != null 
-        ? convertField(deviceMap['office_id']) 
-        : null;
-    deviceMap['office'] = deviceMap['office']?['name'] ?? 'No Office';
-    deviceMap['type'] = deviceMap['type']?['name'] ?? 
-        deviceMap['device_subcategory']?['device_type']?['name'] ?? 
-        'Unknown';
-    deviceMap['category'] = deviceMap['category']?['name'] ?? 
-        deviceMap['device_subcategory']?['device_type']?['device_category']?['name'] ?? 
-        'Unknown';
-    deviceMap['subcategory_id'] = deviceMap['subcategory_id'] != null
-        ? convertField(deviceMap['subcategory_id'])
-        : null;
-    deviceMap['type_id'] = deviceMap['device_subcategory']?['device_type']?['id'] != null
-        ? convertField(deviceMap['device_subcategory']['device_type']['id'])
-        : null;
-
-    return deviceMap;
-  }
-
-  Future<void> applyFilters(Map<String, dynamic> filters) async {
-    await handleAsync(
-      () async {
-        final processedFilters = _processTypeFilter(filters);
-        
-        final result = await _deviceService.getDevices(filters: filters);
-        if (result['status'] == 401) {
-          _devices = [];
-          throw Exception(result['message']);
-        }
-
-        if (result['success'] == true && result['data'] != null) {
-          final data = result['data'] as Map<String, dynamic>;
-          final devicesData = data['devices'] as List? ?? [];
-          final newDevices = devicesData
-              .map(_transformDeviceData)
-              .where((d) => d['id'] != 0)
-              .toList();
-
-          
-          final pagination = data['pagination'] as Map<String, dynamic>? ?? {};
-          final newCurrentPage = int.tryParse(pagination['current_page']?.toString() ?? '1') ?? 1;
-          final newLastPage = int.tryParse(pagination['last_page']?.toString() ?? '1') ?? 1;
-          final newTotal = int.tryParse(pagination['total']?.toString() ?? '0') ?? 0;
-          final newPerPage = int.tryParse(pagination['per_page']?.toString() ?? '10') ?? 10;
-
-          // Update state atomically
-          _devices = newDevices;
-          _currentPage = newCurrentPage;
-          _lastPage = newLastPage;
-          _total = newTotal;
-          _perPage = newPerPage;
-          _lastFetchTime = DateTime.now();
-          notifyListeners();
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to apply filters',
-    );
-  }
-
-  Future<bool> createDevice(Map<String, dynamic> deviceData) async {
-    return await handleAsync(
-      () async {
-        final result = await _deviceService.createDevice(deviceData);
-        if (result['success']) {
-          _devices.add(result['device']);
-          notifyListeners();
-          return true;
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to create device',
-    );
-  }
-
-  Future<bool> updateDevice(int id, Map<String, dynamic> deviceData) async {
-    return await handleAsync(
-      () async {
-        final result = await _deviceService.updateDevice(id, deviceData);
-        if (result['success']) {
-          final index = _devices.indexWhere((device) => device['id'] == id);
-          if (index != -1) {
-            _devices[index] = result['device'];
-            notifyListeners();
-          }
-          return true;
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to update device',
-    );
-  }
-
-  Future<bool> deleteDevice(int id) async {
-    return await handleAsync(
-      () async {
-        final result = await _deviceService.deleteDevice(id);
-        if (result['success']) {
-          _devices.removeWhere((device) => device['id'] == id);
-          notifyListeners();
-          return true;
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to delete device',
-    );
-  }
-
-  Future<bool> uploadDeviceImage(int deviceId, String imagePath) async {
-    return await handleAsync(
-      () async {
-        final result = await _deviceService.uploadDeviceImage(deviceId, imagePath);
-        if (result['success']) {
-          final index = _devices.indexWhere((device) => device['id'] == deviceId);
-          if (index != -1) {
-            _devices[index]['image_url'] = result['data']['image_url'];
-            notifyListeners();
-          }
-          return true;
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to upload device image',
-    );
-  }
-
-  Future<String?> getDeviceImageUrl(int deviceId) async {
-    return await handleAsync(
-      () async {
-        final result = await _deviceService.getDeviceImage(deviceId);
-        if (result['success']) {
-          return result['data']['image_url'];
-        } else {
-          throw Exception(result['message']);
-        }
-      },
-      errorMessage: 'Failed to get device image',
-    );
-  }
-
-  bool _isLoading = false;
-  String? _error;
-
+  DeviceModel? get currentDevice => _currentDevice;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Map<String, dynamic>? get filters => _filters;
+
+  Future<void> loadDevices() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.getDevices(filters: _filters);
+      if (response.success) {
+        _devices = response.data ?? [];
+        _currentPage = 1;
+        _lastPage = response.meta?.lastPage ?? 1;
+        _total = response.meta?.total ?? 0;
+        _error = null;
+      } else {
+        _error = response.message ?? 'Failed to get devices';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> nextPage() async {
     if (_currentPage < _lastPage) {
-      await loadDevices(page: _currentPage + 1);
+      _currentPage++;
+      await loadDevices();
     }
   }
 
   Future<void> previousPage() async {
     if (_currentPage > 1) {
-      await loadDevices(page: _currentPage - 1);
+      _currentPage--;
+      await loadDevices();
     }
   }
 
   Future<void> goToPage(int page) async {
     if (page >= 1 && page <= _lastPage) {
-      await loadDevices(page: page);
+      _currentPage = page;
+      await loadDevices();
     }
   }
 
-  set isLoading(bool value) {
+  Future<void> loadDeviceTypes() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.getDevices();
+      if (response.success) {
+        _deviceTypes = response.data?.map((device) => {
+          'id': device.id,
+          'name': device.type,
+        }).toList() ?? [];
+        _error = null;
+      } else {
+        _error = response.message;
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> createDevice(DeviceModel device) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.createDevice(device);
+      if (response.success) {
+        await loadDevices();
+        return true;
+      }
+      _error = response.message ?? 'Failed to create device';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateDevice(int id, DeviceModel device) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.updateDevice(id, device);
+      if (response.success) {
+        await loadDevices();
+        return true;
+      }
+      _error = response.message ?? 'Failed to update device';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteDevice(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.deleteDevice(id);
+      if (response.success) {
+        await loadDevices();
+        return true;
+      }
+      _error = response.message ?? 'Failed to delete device';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<DeviceModel?> getDeviceDetails(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.getDevice(id);
+      if (response.success) {
+        _currentDevice = response.data;
+        _error = null;
+        return response.data;
+      }
+      _error = response.message;
+      return null;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> uploadDeviceImage(int deviceId, String imagePath) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.uploadDeviceImage(deviceId, imagePath);
+      if (response.success) {
+        final index = _devices.indexWhere((d) => d.id == deviceId);
+        if (index != -1) {
+          _devices[index] = _devices[index].copyWith(imageUrl: response.data?['image_url']);
+          notifyListeners();
+        }
+        return true;
+      }
+      _error = response.message;
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> getDeviceImageUrl(int deviceId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _deviceService.getDeviceImage(deviceId);
+      if (response.success) {
+        return response.data?['image_url'];
+      }
+      _error = response.message;
+      return null;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void applyFilters(Map<String, dynamic> filters) {
+    _filters = filters;
+    _currentPage = 1;
+    loadDevices();
+  }
+
+  void clearFilters() {
+    _filters = null;
+    _currentPage = 1;
+    loadDevices();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  void setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
-  }
-
-  set error(String? value) {
-    _error = value;
-    notifyListeners();
-  }
-
-  set devices(List<Map<String, dynamic>> value) {
-    _devices = value;
     notifyListeners();
   }
 }

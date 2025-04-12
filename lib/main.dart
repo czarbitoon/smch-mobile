@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/api_service.dart';
+import 'services/device_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/office_provider.dart';
 import 'providers/device_provider.dart';
@@ -15,6 +16,9 @@ import 'screens/admin_dashboard.dart';
 import 'screens/staff_dashboard.dart';
 import 'screens/user_dashboard.dart';
 import 'screens/profile_screen.dart';
+import 'config/app_config.dart';
+import 'services/office_service.dart';
+import 'services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +29,8 @@ void main() async {
   await themeProvider.initTheme();
 
   // Initialize office provider and fetch offices
-  final officeProvider = OfficeProvider();
+  final officeService = OfficeService(ApiService(baseUrl: AppConfig.apiUrl));
+  final officeProvider = OfficeProvider(officeService);
   await officeProvider.loadOffices();
   
   runApp(MyApp(themeProvider: themeProvider, officeProvider: officeProvider));
@@ -39,14 +44,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final apiService = ApiService(baseUrl: AppConfig.apiUrl);
+    final deviceService = DeviceService(apiService);
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider.value(value: officeProvider),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => DeviceProvider()),
-        ChangeNotifierProvider(create: (_) => DeviceReportProvider()),
-        ChangeNotifierProvider(create: (_) => ReportsProvider(ApiService())),
+        ChangeNotifierProvider(create: (_) => AuthProvider(AuthService())),
+        ChangeNotifierProvider(create: (_) => DeviceProvider(deviceService)),
+        ChangeNotifierProvider(create: (_) => DeviceReportProvider(apiService)),
+        ChangeNotifierProvider(create: (_) => ReportsProvider(apiService)),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) => MaterialApp(

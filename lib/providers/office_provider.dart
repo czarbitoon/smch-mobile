@@ -1,117 +1,148 @@
 import 'package:flutter/material.dart';
 import '../services/office_service.dart';
-import 'base_provider.dart';
 
-class OfficeProvider extends BaseProvider {
-  final OfficeService _officeService = OfficeService();
+class OfficeProvider extends ChangeNotifier {
+  final OfficeService _officeService;
   List<Map<String, dynamic>> _offices = [];
+  Map<String, dynamic>? _currentOffice;
+  bool _isLoading = false;
+  String? _error;
+
+  OfficeProvider(this._officeService);
 
   List<Map<String, dynamic>> get offices => _offices;
+  Map<String, dynamic>? get currentOffice => _currentOffice;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
   Future<void> loadOffices() async {
-    await handleAsync(
-      () async {
-        debugPrint('loadOffices: Starting to fetch offices');
-        final result = await _officeService.getOffices();
-        debugPrint('loadOffices: Received API response with success=${result['success']}');
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
-        if (result['success'] == true) {
-          if (result['offices'] == null) {
-            debugPrint('loadOffices: No offices data in response');
-            _offices = [];
-            return;
-          }
+    try {
+      final response = await _officeService.getOffices();
+      if (response.success) {
+        _offices = response.offices;
+        _error = null;
+      } else {
+        _error = response.message ?? 'Failed to get offices';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
-          try {
-            final officesList = List<Map<String, dynamic>>.from(result['offices']);
-            debugPrint('loadOffices: Processing ${officesList.length} offices');
+  Future<bool> getOfficeDetails(int officeId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
-            _offices = officesList.where((office) {
-              if (office == null) {
-                debugPrint('loadOffices: Found null office entry');
-                return false;
-              }
-
-              final bool isValid = office['id'] != null && 
-                                 office['name'] != null && 
-                                 office['name'].toString().isNotEmpty;
-
-              if (!isValid) {
-                debugPrint('loadOffices: Invalid office data: id=${office['id']}, name=${office['name']}');
-              }
-
-              return isValid;
-            }).toList();
-
-            debugPrint('loadOffices: Successfully processed ${_offices.length} valid offices');
-            if (_offices.length != officesList.length) {
-              debugPrint('loadOffices: Filtered out ${officesList.length - _offices.length} invalid offices');
-            }
-          } catch (e) {
-            debugPrint('loadOffices: Error processing office data: $e');
-            setError('Invalid office data format');
-            _offices = [];
-          }
-        } else {
-          final errorMessage = result['message'] ?? 'Failed to load offices';
-          debugPrint('loadOffices: API returned error: $errorMessage');
-          setError(errorMessage);
-          _offices = [];
-        }
-      },
-      errorMessage: 'Failed to load offices',
-    );
+    try {
+      final response = await _officeService.getOffice(officeId);
+      if (response.success && response.office != null) {
+        _currentOffice = response.office;
+        _error = null;
+        return true;
+      }
+      _error = response.message ?? 'Failed to get office details';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> createOffice(Map<String, dynamic> officeData) async {
-    return await handleAsync(
-      () async {
-        final result = await _officeService.createOffice(officeData);
-        if (result['success']) {
-          _offices.add(result['office']);
-          notifyListeners();
-          return true;
-        } else {
-          setError(result['message']);
-          return false;
-        }
-      },
-      errorMessage: 'Failed to create office',
-    );
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _officeService.createOffice(officeData);
+      if (response.success) {
+        await loadOffices();
+        return true;
+      }
+      _error = response.message ?? 'Failed to create office';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  Future<bool> updateOffice(int id, Map<String, dynamic> officeData) async {
-    return await handleAsync(
-      () async {
-        final result = await _officeService.updateOffice(id, officeData);
-        if (result['success']) {
-          final index = _offices.indexWhere((office) => office['id'] == id);
-          if (index != -1) {
-            _offices[index] = result['office'];
-            notifyListeners();
-          }
-          return true;
-        } else {
-          throw Exception(result['message']);
+  Future<bool> updateOffice(int officeId, Map<String, dynamic> officeData) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _officeService.updateOffice(officeId, officeData);
+      if (response.success) {
+        await loadOffices();
+        if (_currentOffice != null && _currentOffice!['id'] == officeId) {
+          _currentOffice = response.office;
         }
-      },
-      errorMessage: 'Failed to update office',
-    );
+        return true;
+      }
+      _error = response.message ?? 'Failed to update office';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  Future<bool> deleteOffice(int id) async {
-    return await handleAsync(
-      () async {
-        final result = await _officeService.deleteOffice(id);
-        if (result['success']) {
-          _offices.removeWhere((office) => office['id'] == id);
-          notifyListeners();
-          return true;
-        } else {
-          throw Exception(result['message']);
+  Future<bool> deleteOffice(int officeId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _officeService.deleteOffice(officeId);
+      if (response.success) {
+        if (_currentOffice != null && _currentOffice!['id'] == officeId) {
+          _currentOffice = null;
         }
-      },
-      errorMessage: 'Failed to delete office',
-    );
+        await loadOffices();
+        return true;
+      }
+      _error = response.message ?? 'Failed to delete office';
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void clearCurrentOffice() {
+    _currentOffice = null;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  void setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
   }
 }

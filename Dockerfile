@@ -1,74 +1,78 @@
-# Stage 1: Build environment
-FROM ubuntu:22.04 AS builder
+# Builder stage
+FROM ubuntu:22.04 as builder
 
-# Install Flutter
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Set environment variables
+ENV ANDROID_HOME=/opt/android-sdk-linux
+ENV FLUTTER_HOME=/sdks/flutter
+ENV PATH=${PATH}:${FLUTTER_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
     curl \
     git \
     unzip \
     xz-utils \
     zip \
-    libglu1-mesa \
-    openjdk-17-jdk-headless \
-    && rm -rf /var/lib/apt/lists/* \
-    && git clone https://github.com/flutter/flutter.git /sdks/flutter \
-    && cd /sdks/flutter \
-    && git checkout stable \
-    && ./bin/flutter --version
+    openjdk-11-jdk \
+    wget \
+    dos2unix \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Android SDK with retry mechanism
-RUN mkdir -p /opt/android-sdk-linux/cmdline-tools \
-    && for i in {1..3}; do \
-        curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o /tmp/cmdline-tools.zip \
-        && unzip -q /tmp/cmdline-tools.zip -d /opt/android-sdk-linux/cmdline-tools \
-        && mv /opt/android-sdk-linux/cmdline-tools/cmdline-tools /opt/android-sdk-linux/cmdline-tools/latest \
-        && rm -f /tmp/cmdline-tools.zip \
-        && break \
-        || { echo "Download failed, retrying in 5 seconds..."; sleep 5; }; \
-    done
+# Install Android SDK
+RUN mkdir -p ${ANDROID_HOME} && \
+    wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip -O android-sdk.zip && \
+    unzip -q android-sdk.zip -d ${ANDROID_HOME} && \
+    mkdir -p ${ANDROID_HOME}/cmdline-tools/latest && \
+    mv ${ANDROID_HOME}/cmdline-tools/* ${ANDROID_HOME}/cmdline-tools/latest/ || true && \
+    rm android-sdk.zip
 
-# Set environment variables
-ENV ANDROID_HOME=/opt/android-sdk-linux \
-    FLUTTER_HOME=/sdks/flutter \
-    PATH=${PATH}:/sdks/flutter/bin:/opt/android-sdk-linux/cmdline-tools/latest/bin
+# Accept licenses
+RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses
 
-# Accept licenses and setup Android SDK with retry mechanism
-RUN mkdir -p ${ANDROID_HOME}/licenses \
-    && echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ${ANDROID_HOME}/licenses/android-sdk-license \
-    && echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ${ANDROID_HOME}/licenses/android-sdk-license \
-    && for i in {1..3}; do \
-        yes | sdkmanager --licenses > /dev/null \
-        && sdkmanager --install "platform-tools" "build-tools;34.0.0" "platforms;android-34" > /dev/null \
-        && break \
-        || { echo "SDK installation failed, retrying in 5 seconds..."; sleep 5; }; \
-    done
+# Install SDK components
+RUN ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
 
-# Set up non-root user and prepare workspace
-RUN groupadd -r flutter && useradd -r -g flutter -m -d /home/flutter flutter \
-    && mkdir /app && chown -R flutter:flutter /app /sdks/flutter
+# Download Flutter SDK
+RUN git clone https://github.com/flutter/flutter.git ${FLUTTER_HOME} && \
+    cd ${FLUTTER_HOME} && \
+    git checkout stable && \
+    ${FLUTTER_HOME}/bin/flutter config --no-analytics
 
+# Create a non-root user
+RUN useradd -ms /bin/bash developer
+WORKDIR /home/developer/app
+COPY . .
+
+# Fix Windows line endings and make scripts executable
+RUN dos2unix init_flutter.sh fix_embedding.sh build_apk.sh && \
+    chmod +x init_flutter.sh fix_embedding.sh build_apk.sh
+
+# Give ownership to the developer user
+RUN chown -R developer:developer /home/developer && \
+    chown -R developer:developer ${FLUTTER_HOME} && \
+    chown -R developer:developer ${ANDROID_HOME}
+
+# Switch to the developer user
+USER developer
+
+# Run initialization and build scripts with proper error handling
+RUN bash -c 'set -e; \
+    echo "Running init_flutter.sh..."; \
+    ./init_flutter.sh; \
+    echo "Running fix_embedding.sh..."; \
+    ./fix_embedding.sh; \
+    echo "Running build_apk.sh..."; \
+    ./build_apk.sh; \
+    echo "Build completed successfully!"'
+
+# Cleanup to reduce image size
+RUN rm -rf ${FLUTTER_HOME}/.pub-cache
+
+# Distribution image
+FROM alpine:latest
 WORKDIR /app
-USER flutter
+COPY --from=builder /home/developer/app/build/app/outputs/flutter-apk/app-release.apk /app/
+COPY --from=builder /home/developer/app/build/app/outputs/flutter-apk/app-debug.apk /app/
 
-# Configure Flutter and prepare for build
-RUN git config --global --add safe.directory /sdks/flutter \
-    && flutter config --no-analytics \
-    && mkdir -p android \
-    && echo "flutter.sdk=${FLUTTER_HOME}\nsdk.dir=${ANDROID_HOME}" > android/local.properties
-
-# Copy dependency files and install
-COPY --chown=flutter:flutter pubspec.* ./
-RUN flutter pub get --no-offline
-
-# Copy source and build
-COPY --chown=flutter:flutter . .
-RUN flutter build apk --release \
-    && rm -rf /app/.dart_tool /app/.pub-cache /app/build/app/intermediates \
-    && find /app -name "*.dart.js.deps" -delete \
-    && find /app -name "*.dart.js.map" -delete
-
-# Stage 2: Distribution image
-FROM alpine:3.18.2
-WORKDIR /app
-COPY --from=builder /app/build/app/outputs/flutter-apk/app-release.apk ./
-CMD ["cp", "app-release.apk", "/output/"]
+# Set a default command to show the APKs
+CMD ["ls", "-la", "/app"]

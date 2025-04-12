@@ -3,15 +3,39 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import 'api_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 
 class AuthService {
   // Get base URL from AppConfig
   String get baseUrl => AppConfig.apiBaseUrl;
   final _storage = const FlutterSecureStorage();
+  final Dio _dio;
+  
   static const Map<String, String> _headers = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
   };
+  
+  AuthService() : _dio = Dio(BaseOptions(
+    baseUrl: AppConfig.apiUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+  )) {
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final token = await _getToken();
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        return handler.next(options);
+      },
+    ));
+  }
 
   Future<Map<String, dynamic>?> getCurrentUser() async {
     try {
@@ -280,7 +304,7 @@ class AuthService {
   Future<List<Map<String, dynamic>>> getOffices() async {
     try {
       // Create an instance of ApiService which properly handles unprotected endpoints
-      final apiService = ApiService();
+      final apiService = ApiService(baseUrl: AppConfig.apiUrl);
       
       // Use ApiService to make the request to the unprotected offices endpoint
       final response = await apiService.get('offices');
@@ -441,6 +465,33 @@ class AuthService {
     } catch (e) {
       _logError('updateUserProfile', e);
       return {'success': false, 'message': 'Error updating profile: ${e.toString()}'};
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      final apiService = ApiService(baseUrl: AppConfig.apiUrl);
+      await apiService.post('auth/logout', {});
+    } catch (e) {
+      debugPrint('Error during logout: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadProfileImage(int userId, String imagePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(imagePath),
+      });
+      
+      final response = await _dio.post(
+        'users/$userId/profile-image',
+        data: formData,
+      );
+      
+      return response.data;
+    } catch (e) {
+      debugPrint('Error uploading profile image: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 }

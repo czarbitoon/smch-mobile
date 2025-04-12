@@ -378,7 +378,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
               final deviceProvider = Provider.of<DeviceProvider>(context, listen: false);
               await deviceProvider.loadDevices();
               setState(() {
-                _devices = deviceProvider.devices;
+                _devices = deviceProvider.devices.map((device) => {
+                  'id': device.id,
+                  'name': device.name,
+                  'type': device.type,
+                  'status': device.status,
+                  'office_id': device.officeId,
+                }).toList();
               });
             });
           }
@@ -480,13 +486,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             orElse: () => {'name': 'Device'},
                           );
 
-                          final success = await reportsProvider.submitReport(
-                            deviceId: _selectedDeviceId!,
-                            title: 'Issue Report - ${selectedDevice['name']}',
-                            description: _descriptionController.text,
-                            priority: _selectedPriority,
-                            status: 'Pending',
-                          );
+                          final success = await reportsProvider.submitReport({
+                            'title': _titleController.text,
+                            'description': _descriptionController.text,
+                            'priority': _selectedPriority,
+                            'status': 'Pending',
+                            'device_id': _selectedDeviceId,
+                          });
 
                           if (!mounted) return;
 

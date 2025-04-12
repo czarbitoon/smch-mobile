@@ -5,25 +5,27 @@ import 'base_provider.dart';
 import 'dart:io';
 import 'dart:async' show unawaited;
 
-class AuthProvider extends BaseProvider {
-  final AuthService _authService = AuthService();
-  Map<String, dynamic>? _userData;
+class AuthProvider extends ChangeNotifier {
+  final AuthService _authService;
   UserModel? _user;
+  bool _isLoading = false;
+  String? _error;
+  Map<String, dynamic>? _userData;
   
+  AuthProvider([AuthService? authService]) : _authService = authService ?? AuthService();
+
   String get apiBaseUrl => _authService.baseUrl;
 
+  UserModel? get user => _user;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
   bool get isAuthenticated => _userData != null;
   Map<String, dynamic>? get userData => _userData;
-  UserModel? get user => _user;
 
   // Role-based access control getters
-  int get userType => _user?.type ?? 0;
+  int get userType => _user?.role == 'admin' ? 1 : (_user?.role == 'staff' ? 2 : 0);
   bool get isAdmin => userType >= 2;
   bool get isStaff => userType == 1;
-
-  AuthProvider() {
-    _initializeAuth();
-  }
 
   bool _isInitializing = false;
   bool _isLoadingProfile = false;
@@ -157,34 +159,62 @@ class AuthProvider extends BaseProvider {
     }
   }
 
-  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> profileData, File? profileImage) async {
-    if (_isInitializing || _isLoadingProfile) {
-      return {'success': false, 'message': 'Profile update operation in progress'};
-    }
-
-    setLoading(true);
-    clearError();
+  Future<bool> updateProfile(Map<String, dynamic> userData) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
 
     try {
-      final result = await _authService.updateUserProfile(profileData);
-      
-      if (result['success']) {
-        if (profileImage != null) {
-          // TODO: Implement image upload when backend endpoint is ready
-          // For now, we'll just return success
-        }
-        
-        if (!_isLoadingProfile) {
-          await _loadUserProfile();
+      // Upload image if provided
+      if (userData['image'] != null && userData['image'] is File) {
+        final imageFile = userData['image'] as File;
+        final result = await _uploadProfileImage(userData['id'], imageFile.path);
+        if (result) {
+          userData.remove('image');
         }
       }
+
+      final response = await _authService.updateUserProfile(userData);
       
-      return result;
+      if (response['success'] == true) {
+        _user = UserModel.fromJson(response['data']);
+        _error = null;
+        return true;
+      }
+      
+      _error = response['message'] ?? 'Failed to update profile';
+      return false;
     } catch (e) {
-      setError('Failed to update profile: ${e.toString()}');
-      return {'success': false, 'message': e.toString()};
+      _error = e.toString();
+      return false;
     } finally {
-      setLoading(false);
+      _isLoading = false;
+      notifyListeners();
     }
   }
+
+  Future<bool> _uploadProfileImage(int userId, String imagePath) async {
+    try {
+      final response = await _authService.uploadProfileImage(userId, imagePath);
+      return response['success'] == true;
+    } catch (e) {
+      _error = 'Failed to upload profile image: $e';
+      return false;
+    }
   }
+
+  void setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  void setError(String? error) {
+    _error = error;
+    notifyListeners();
+  }
+}

@@ -44,9 +44,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _loadUserData() {
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     if (user != null) {
-      _nameController.text = user['name'] ?? '';
-      _emailController.text = user['email'] ?? '';
-      _phoneController.text = user['phone'] ?? '';
+      _nameController.text = user.name ?? '';
+      _emailController.text = user.email ?? '';
+      _phoneController.text = user.phone ?? '';
     }
   }
 
@@ -88,10 +88,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       final updatedUser = {
-        ...user,
+        'id': user.id,
         'name': _nameController.text,
         'email': _emailController.text,
         'phone': _phoneController.text,
+        'role': user.role,
         if (_image != null) 'image': _image,
       };
 
@@ -161,10 +162,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       radius: 60,
                       backgroundImage: _image != null
                           ? FileImage(_image!)
-                          : user['image_url'] != null
-                              ? NetworkImage(user['image_url'])
+                          : user.imageUrl != null
+                              ? NetworkImage(user.imageUrl!)
                               : null,
-                      child: _image == null && user['image_url'] == null
+                      child: _image == null && user.imageUrl == null
                           ? const Icon(Icons.person, size: 60)
                           : null,
                     ),
@@ -283,15 +284,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ListTile(
                         leading: const Icon(Icons.person_outline),
                         title: const Text('Role'),
-                        subtitle: Text(user['role'] ?? 'User'),
+                        subtitle: Text(user.role ?? 'User'),
                       ),
                       ListTile(
                         leading: const Icon(Icons.calendar_today),
                         title: const Text('Member Since'),
                         subtitle: Text(
-                          user['created_at'] != null
+                          user.createdAt != null
                               ? DateFormat('MMM d, y').format(
-                                  DateTime.parse(user['created_at']))
+                                  DateTime.parse(user.createdAt!))
                               : 'Unknown',
                         ),
                       ),
@@ -299,9 +300,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         leading: const Icon(Icons.security),
                         title: const Text('Last Login'),
                         subtitle: Text(
-                          user['last_login'] != null
+                          user.lastLogin != null
                               ? DateFormat('MMM d, y h:mm a').format(
-                                  DateTime.parse(user['last_login']))
+                                  DateTime.parse(user.lastLogin!))
                               : 'Unknown',
                         ),
                       ),

@@ -5,6 +5,8 @@ import 'package:smch_mobile/providers/auth_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
+import 'package:smch_mobile/providers/office_provider.dart';
+import 'package:smch_mobile/providers/device_report_provider.dart';
 
 class DeviceReportScreen extends StatefulWidget {
   final int deviceId;
@@ -82,11 +84,11 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
         'description': _descriptionController.text,
         'priority': _selectedPriority,
         'category': _selectedCategory,
-        'reported_by': authProvider.user?['id'],
+        'reported_by': authProvider.user?.id,
         'image': _image,
       };
 
-      await deviceProvider.submitReport(report);
+      await context.read<DeviceReportProvider>().submitDeviceReport(widget.deviceId, report);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -111,6 +113,15 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  String _getOfficeName(int officeId) {
+    final officeProvider = Provider.of<OfficeProvider>(context, listen: false);
+    final office = officeProvider.offices.firstWhere(
+      (office) => office['id'] == officeId,
+      orElse: () => {'name': 'Unknown'},
+    );
+    return office['name'] ?? 'Unknown';
   }
 
   @override
@@ -165,12 +176,12 @@ class _DeviceReportScreenState extends State<DeviceReportScreen> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Type: ${device['type']}'),
-                              Text('Status: ${device['status']}'),
-                              Text('Office: ${device['office']}'),
-                              if (device['last_maintenance'] != null)
+                              Text('Type: ${device.type}'),
+                              Text('Status: ${device.status}'),
+                              Text('Office: ${_getOfficeName(device.officeId)}'),
+                              if (device.lastMaintenance != null)
                                 Text(
-                                  'Last Maintenance: ${DateFormat('MMM d, y').format(DateTime.parse(device['last_maintenance']))}',
+                                  'Last Maintenance: ${DateFormat('MMM d, y').format(DateTime.parse(device.lastMaintenance!))}',
                                 ),
                             ],
                           );

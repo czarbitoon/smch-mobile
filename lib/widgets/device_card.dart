@@ -228,13 +228,13 @@ class _DeviceCardState extends State<DeviceCard> with SingleTickerProviderStateM
             onPressed: reportProvider.isLoading
                 ? null
                 : () async {
-                    final success = await reportProvider.submitReport(
-                      deviceId: widget.device['id'],
-                      title: 'Device Issue Report',
-                      description: descriptionController.text,
-                      priority: 'Medium',
-                      status: 'Pending',
-                    );
+                    final success = await reportProvider.submitReport({
+                      'title': 'Quick Report - ${widget.device['name']}',
+                      'description': descriptionController.text,
+                      'priority': 'Medium',
+                      'status': 'Pending',
+                      'device_id': widget.device['id'],
+                    });
                     if (success == true) {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(

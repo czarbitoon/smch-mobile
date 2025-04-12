@@ -1,172 +1,229 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/app_config.dart';
 import 'api_service.dart';
 
+final officeServiceProvider = Provider<OfficeService>((ref) {
+  return OfficeService(ref.watch(apiServiceProvider));
+});
+
 class OfficeService {
-  final ApiService _apiService = ApiService();
+  final ApiService _apiService;
+  final Map<String, dynamic> _cache = {};
+  final Duration _cacheDuration = const Duration(minutes: 5);
+  final Map<String, DateTime> _cacheTimestamps = {};
 
-  Future<Map<String, dynamic>> getOffices({int? page}) async {
-    debugPrint('[OfficeService] Fetching offices, page: ${page ?? 'all'}');
+  OfficeService(this._apiService);
+
+  Future<OfficeListResponse> getOffices() async {
+    final cacheKey = 'offices';
+    if (_isCacheValid(cacheKey)) {
+      return _cache[cacheKey];
+    }
+
     try {
-      final queryParams = page != null ? {'page': page.toString()} : null;
-      debugPrint('[OfficeService] Making API request to endpoint: offices');
-      final response = await _apiService.get('offices', queryParams: queryParams);
-      debugPrint('[OfficeService] API request completed with status: ${response['success'] == true ? 'success' : 'failure'}');
-      debugPrint('[OfficeService] Raw response: ${response.toString().substring(0, response.toString().length > 200 ? 200 : response.toString().length)}...');
+      final response = await _apiService.get('offices');
       
-      final result = _processResponse(response);
-      debugPrint('[OfficeService] Processed response: success=${result['success']}, offices count: ${result['offices']?.length ?? 0}');
-      if (!result['success']) {
-        debugPrint('[OfficeService] Error message: ${result['message']}');
+      if (response['success'] == true) {
+        final offices = response['data'] != null
+            ? List<Map<String, dynamic>>.from(response['data'])
+            : <Map<String, dynamic>>[];
+        
+        final result = OfficeListResponse(
+          success: true,
+          message: response['message'],
+          offices: offices,
+        );
+        
+        _cache[cacheKey] = result;
+        _cacheTimestamps[cacheKey] = DateTime.now();
+        return result;
       }
-      return result;
-    } catch (e, stackTrace) {
-      debugPrint('[OfficeService] Exception while fetching offices: $e');
-      debugPrint('[OfficeService] Exception type: ${e.runtimeType}');
-      debugPrint('[OfficeService] Stack trace: $stackTrace');
-      return _handleError(e, stackTrace, 'Failed to fetch offices');
+      
+      return OfficeListResponse(
+        success: false,
+        message: response['message'] ?? 'Failed to get offices',
+        offices: [],
+      );
+    } catch (e) {
+      debugPrint('Error fetching offices: $e');
+      return OfficeListResponse(
+        success: false,
+        message: e.toString(),
+        offices: [],
+      );
     }
   }
 
-  Future<Map<String, dynamic>> createOffice(Map<String, dynamic> officeData) async {
-    return _handleApiCall(() => _apiService.post('offices', officeData), 'create office');
-  }
+  Future<OfficeResponse> getOffice(int id) async {
+    final cacheKey = 'office_$id';
+    if (_isCacheValid(cacheKey)) {
+      return _cache[cacheKey];
+    }
 
-  Future<Map<String, dynamic>> updateOffice(int id, Map<String, dynamic> officeData) async {
-    return _handleApiCall(() => _apiService.put('offices/$id', officeData), 'update office');
-  }
-
-  Future<Map<String, dynamic>> deleteOffice(int id) async {
-    return _handleApiCall(() => _apiService.delete('offices/$id'), 'delete office');
-  }
-
-  Future<Map<String, dynamic>> _handleApiCall(Future<Map<String, dynamic>> Function() apiCall, String action) async {
     try {
-      final response = await apiCall();
-      return _processResponse(response);
-    } catch (e, stackTrace) {
-      return _handleError(e, stackTrace, 'Failed to $action');
-    }
-  }
-
-  Map<String, dynamic> _processResponse(Map<String, dynamic> response) {
-    debugPrint('[OfficeService] Processing API response: ${response.toString().substring(0, response.toString().length > 100 ? 100 : response.toString().length)}...');
-    if (response['success'] == true) {
-      final data = response['data'];
-      debugPrint('[OfficeService] Response data: ${data != null ? 'present' : 'null'}');
-      if (data != null) {
-        final offices = _extractOffices(data);
-        debugPrint('[OfficeService] Extracted offices: ${offices != null ? '${offices.length} offices found' : 'null'}');
-        if (offices != null) {
-          return {'success': true, 'offices': offices};
-        }
-      }
-      debugPrint('[OfficeService] Invalid response format: data=${data}');
-      return {'success': false, 'message': 'Invalid response format'};
-    }
-    debugPrint('[OfficeService] API returned error: ${response['message'] ?? 'Unknown error'}');
-    return {'success': false, 'message': response['message'] ?? 'Unknown error'};
-  }
-
-  List<Map<String, dynamic>>? _extractOffices(dynamic data) {
-    debugPrint('[OfficeService] Extracting offices from data type: ${data.runtimeType}');
-    debugPrint('[OfficeService] Raw data: ${data.toString().substring(0, data.toString().length > 200 ? 200 : data.toString().length)}...');
-    
-    List? officesList;
-    if (data is Map<String, dynamic>) {
-      debugPrint('[OfficeService] Data is Map with keys: ${data.keys.join(', ')}');
+      final response = await _apiService.get('offices/$id');
       
-      if (data.containsKey('offices')) {
-        final officesData = data['offices'];
-        debugPrint('[OfficeService] Found offices key with type: ${officesData.runtimeType}');
-        if (officesData is List) {
-          officesList = officesData;
-          debugPrint('[OfficeService] Found offices key with ${officesList.length} items');
-        } else {
-          debugPrint('[OfficeService] offices key is not a List: ${officesData.runtimeType}');
-        }
-      } else if (data.containsKey('data')) {
-        final dataValue = data['data'];
-        debugPrint('[OfficeService] Found data key with type: ${dataValue.runtimeType}');
-        if (dataValue is List) {
-          officesList = dataValue;
-          debugPrint('[OfficeService] Found data key with ${officesList.length} items');
-        } else if (dataValue is Map<String, dynamic> && dataValue.containsKey('offices')) {
-          final nestedOffices = dataValue['offices'];
-          if (nestedOffices is List) {
-            officesList = nestedOffices;
-            debugPrint('[OfficeService] Found nested offices in data with ${officesList.length} items');
-          }
-        } else {
-          debugPrint('[OfficeService] data key is not a List or doesn\'t contain offices: ${dataValue.runtimeType}');
-        }
+      if (response['success'] == true) {
+        final office = response['data'] != null
+            ? Map<String, dynamic>.from(response['data'])
+            : null;
+        
+        final result = OfficeResponse(
+          success: true,
+          message: response['message'],
+          office: office,
+        );
+        
+        _cache[cacheKey] = result;
+        _cacheTimestamps[cacheKey] = DateTime.now();
+        return result;
       }
-    } else if (data is List) {
-      officesList = data;
-      debugPrint('[OfficeService] Data is List with ${officesList.length} items');
+      
+      return OfficeResponse(
+        success: false,
+        message: response['message'] ?? 'Failed to get office details',
+        office: null,
+      );
+    } catch (e) {
+      debugPrint('Error fetching office: $e');
+      return OfficeResponse(
+        success: false,
+        message: e.toString(),
+        office: null,
+      );
     }
-
-    if (officesList == null) {
-      debugPrint('[OfficeService] No offices list found in data');
-      return null;
-    }
-
-    debugPrint('[OfficeService] Processing ${officesList.length} offices');
-    final convertedOffices = <Map<String, dynamic>>[];
-    for (var i = 0; i < officesList.length; i++) {
-      var office = officesList[i];
-      if (office is! Map<String, dynamic>) {
-        debugPrint('[OfficeService] Skipping office at index $i: not a Map');
-        continue;
-      }
-
-      final id = _parseInt(office['id']);
-      if (id == 0) {
-        debugPrint('[OfficeService] Skipping office with invalid id: ${office['id']}');
-        continue;
-      }
-
-      final officeName = office['name']?.toString() ?? 'Unnamed Office';
-      debugPrint('[OfficeService] Adding office: id=$id, name=$officeName');
-      convertedOffices.add({
-        'id': id,
-        'name': officeName,
-        'description': office['description']?.toString() ?? '',
-        'devices_count': _parseInt(office['devices_count']),
-        'created_at': office['created_at']?.toString(),
-        'updated_at': office['updated_at']?.toString(),
-      });
-    }
-
-    debugPrint('[OfficeService] Extracted ${convertedOffices.length} valid offices');
-    return convertedOffices.isNotEmpty ? convertedOffices : null;
   }
 
-  int _parseInt(dynamic value) {
-    return int.tryParse(value.toString()) ?? 0;
-  }
-
-  Map<String, dynamic> _handleError(dynamic e, StackTrace stackTrace, String message) {
-    debugPrint('[OfficeService] Error: $e');
-    debugPrint('[OfficeService] Error type: ${e.runtimeType}');
-    debugPrint('[OfficeService] Error message: $message');
-    debugPrint('[OfficeService] StackTrace: $stackTrace');
-
-    String errorMessage = message;
-    if (e is Exception) {
-      if (e.toString().contains('SocketException') || e.toString().contains('Connection refused')) {
-        errorMessage = 'Network error: Please check your internet connection';
-      } else if (e.toString().contains('TimeoutException')) {
-        errorMessage = 'Request timed out: Please try again';
-      } else if (e.toString().contains('Invalid response format')) {
-        errorMessage = 'Server returned invalid data format';
+  Future<OfficeResponse> createOffice(Map<String, dynamic> officeData) async {
+    try {
+      final response = await _apiService.post('offices', officeData);
+      
+      _invalidateCache('offices');
+      
+      if (response['success'] == true) {
+        final office = response['data'] != null
+            ? Map<String, dynamic>.from(response['data'])
+            : null;
+        
+        return OfficeResponse(
+          success: true,
+          message: response['message'],
+          office: office,
+        );
       }
+      
+      return OfficeResponse(
+        success: false,
+        message: response['message'] ?? 'Failed to create office',
+        office: null,
+      );
+    } catch (e) {
+      debugPrint('Error creating office: $e');
+      return OfficeResponse(
+        success: false,
+        message: e.toString(),
+        office: null,
+      );
     }
-
-    return {
-      'success': false,
-      'message': errorMessage,
-      'error_type': e.runtimeType.toString(),
-      'error_details': e.toString()
-    };
   }
+
+  Future<OfficeResponse> updateOffice(int id, Map<String, dynamic> officeData) async {
+    try {
+      final response = await _apiService.put('offices/$id', officeData);
+      
+      _invalidateCache('offices');
+      _invalidateCache('office_$id');
+      
+      if (response['success'] == true) {
+        final office = response['data'] != null
+            ? Map<String, dynamic>.from(response['data'])
+            : null;
+        
+        return OfficeResponse(
+          success: true,
+          message: response['message'],
+          office: office,
+        );
+      }
+      
+      return OfficeResponse(
+        success: false,
+        message: response['message'] ?? 'Failed to update office',
+        office: null,
+      );
+    } catch (e) {
+      debugPrint('Error updating office: $e');
+      return OfficeResponse(
+        success: false,
+        message: e.toString(),
+        office: null,
+      );
+    }
+  }
+
+  Future<OfficeResponse> deleteOffice(int id) async {
+    try {
+      final response = await _apiService.delete('offices/$id');
+      
+      _invalidateCache('offices');
+      _invalidateCache('office_$id');
+      
+      if (response['success'] == true) {
+        return OfficeResponse(
+          success: true,
+          message: response['message'],
+          office: null,
+        );
+      }
+      
+      return OfficeResponse(
+        success: false,
+        message: response['message'] ?? 'Failed to delete office',
+        office: null,
+      );
+    } catch (e) {
+      debugPrint('Error deleting office: $e');
+      return OfficeResponse(
+        success: false,
+        message: e.toString(),
+        office: null,
+      );
+    }
+  }
+
+  bool _isCacheValid(String key) {
+    final timestamp = _cacheTimestamps[key];
+    if (timestamp == null) return false;
+    return DateTime.now().difference(timestamp) < _cacheDuration;
+  }
+
+  void _invalidateCache(String key) {
+    _cache.remove(key);
+    _cacheTimestamps.remove(key);
+  }
+}
+
+class OfficeListResponse {
+  final bool success;
+  final String? message;
+  final List<Map<String, dynamic>> offices;
+
+  OfficeListResponse({
+    required this.success,
+    this.message,
+    required this.offices,
+  });
+}
+
+class OfficeResponse {
+  final bool success;
+  final String? message;
+  final Map<String, dynamic>? office;
+
+  OfficeResponse({
+    required this.success,
+    this.message,
+    this.office,
+  });
 }

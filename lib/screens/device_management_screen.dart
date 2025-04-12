@@ -9,6 +9,7 @@ import 'device_report_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
+import '../models/device_model.dart';
 
 class DeviceManagementScreen extends StatefulWidget {
   const DeviceManagementScreen({super.key});
@@ -249,10 +250,10 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                           return AnimatedSwitcher(
                             duration: const Duration(milliseconds: 300),
                             child: DeviceCard(
-                              key: ValueKey(device['id']),
-                              device: device,
+                              key: ValueKey(device.id),
+                              device: _convertDeviceModelToMap(device),
                               onEdit: () => _showDeviceDialog(device: device),
-                              onDelete: () => _deleteDevice(device['id']),
+                              onDelete: () => _deleteDevice(device.id),
                             ),
                           );
                         },
@@ -326,12 +327,12 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     );
   }
 
-  Future<void> _showDeviceDialog({Map<String, dynamic>? device}) async {
+  Future<void> _showDeviceDialog({DeviceModel? device}) async {
     final isEditing = device != null;
-    _nameController.text = device?['name'] ?? '';
-    _typeController.text = device?['type'] ?? '';
-    _selectedOffice = device?['office_id']?.toString();
-    _selectedStatus = device?['status'];
+    _nameController.text = device?.name ?? '';
+    _typeController.text = device?.type ?? '';
+    _selectedOffice = device?.officeId?.toString();
+    _selectedStatus = device?.status;
     _imageFile = null;
 
     final result = await showDialog<Map<String, dynamic>>(
@@ -343,7 +344,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_imageFile != null || device?['image_url'] != null)
+                if (_imageFile != null || device?.imageUrl != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: ClipRRect(
@@ -356,10 +357,20 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                               fit: BoxFit.cover,
                             )
                           : Image.network(
-                              device!['image_url'],
+                              device!.imageUrl ?? '',
                               height: 150,
                               width: double.infinity,
                               fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 150,
+                                  width: double.infinity,
+                                  color: Colors.grey.shade200,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                                  ),
+                                );
+                              },
                             ),
                     ),
                   ),
@@ -456,12 +467,12 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     if (result != null) {
       final deviceProvider = context.read<DeviceProvider>();
       final success = isEditing
-          ? await deviceProvider.updateDevice(device!['id'], result)
-          : await deviceProvider.createDevice(result);
+          ? await deviceProvider.updateDevice(device!.id, DeviceModel.fromJson(result))
+          : await deviceProvider.createDevice(DeviceModel.fromJson(result));
 
       if (success && result['image_file'] != null) {
         await deviceProvider.uploadDeviceImage(
-          isEditing ? device['id'] : deviceProvider.devices.last['id'],
+          isEditing ? device.id : deviceProvider.devices.last.id,
           result['image_file'].path,
         );
       }
@@ -489,12 +500,12 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     }
   }
 
-  void _showDeleteConfirmation(Map<String, dynamic> device) {
+  void _showDeleteConfirmation(DeviceModel device) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Device'),
-        content: Text('Are you sure you want to delete ${device['name']}?'),
+        content: Text('Are you sure you want to delete ${device.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -504,7 +515,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
             onPressed: () async {
               final success = await context
                   .read<DeviceProvider>()
-                  .deleteDevice(device['id']);
+                  .deleteDevice(device.id);
               if (mounted) {
                 Navigator.pop(context);
                 if (!success) {
@@ -522,6 +533,24 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
         ],
       ),
     );
+  }
+
+  Map<String, dynamic> _convertDeviceModelToMap(DeviceModel device) {
+    return {
+      'id': device.id,
+      'name': device.name,
+      'description': device.description,
+      'office_id': device.officeId,
+      'type_id': device.typeId,
+      'type': device.type,
+      'subcategory': device.subcategory,
+      'status': device.status,
+      'serial_number': device.serialNumber,
+      'purchase_date': device.purchaseDate,
+      'warranty_expiration': device.warrantyExpiration,
+      'notes': device.notes,
+      'image_url': device.imageUrl,
+    };
   }
 }
 

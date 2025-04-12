@@ -1,31 +1,34 @@
 class UserModel {
-  final int? id;
-  final String? name;
-  final String? email;
-  final String? profilePicture;
-  final int? type;
-  final int? officeId;
-  final String? officeName;
+  final int id;
+  final String name;
+  final String email;
+  final String? phone;
+  final String role;
+  final String? imageUrl;
+  final String? createdAt;
+  final String? lastLogin;
 
   UserModel({
-    this.id,
-    this.name,
-    this.email,
-    this.profilePicture,
-    this.type,
-    this.officeId,
-    this.officeName,
+    required this.id,
+    required this.name,
+    required this.email,
+    this.phone,
+    required this.role,
+    this.imageUrl,
+    this.createdAt,
+    this.lastLogin,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'],
-      name: json['name'],
-      email: json['email'],
-      profilePicture: json['profile_picture'],
-      type: json['type'],
-      officeId: json['office_id'],
-      officeName: json['office'] != null ? json['office']['name'] : null,
+      id: json['id'] as int,
+      name: json['name'] as String,
+      email: json['email'] as String,
+      phone: json['phone'] as String?,
+      role: json['role'] as String,
+      imageUrl: json['image_url'] as String?,
+      createdAt: json['created_at'] as String?,
+      lastLogin: json['last_login'] as String?,
     );
   }
 
@@ -34,9 +37,11 @@ class UserModel {
       'id': id,
       'name': name,
       'email': email,
-      'profile_picture': profilePicture,
-      'type': type,
-      'office_id': officeId,
+      'phone': phone,
+      'role': role,
+      'image_url': imageUrl,
+      'created_at': createdAt,
+      'last_login': lastLogin,
     };
   }
 
@@ -44,19 +49,21 @@ class UserModel {
     int? id,
     String? name,
     String? email,
-    String? profilePicture,
-    int? type,
-    int? officeId,
-    String? officeName,
+    String? phone,
+    String? role,
+    String? imageUrl,
+    String? createdAt,
+    String? lastLogin,
   }) {
     return UserModel(
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
-      profilePicture: profilePicture ?? this.profilePicture,
-      type: type ?? this.type,
-      officeId: officeId ?? this.officeId,
-      officeName: officeName ?? this.officeName,
+      phone: phone ?? this.phone,
+      role: role ?? this.role,
+      imageUrl: imageUrl ?? this.imageUrl,
+      createdAt: createdAt ?? this.createdAt,
+      lastLogin: lastLogin ?? this.lastLogin,
     );
   }
 }
