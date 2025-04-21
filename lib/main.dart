@@ -19,10 +19,14 @@ import 'screens/profile_screen.dart';
 import 'config/app_config.dart';
 import 'services/office_service.dart';
 import 'services/auth_service.dart';
+import 'config/network_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SharedPreferences.getInstance();
+  
+  // Print network configuration for debugging
+  NetworkConfig.printDebugInfo();
   
   // Pre-load theme preference before rendering the app
   final themeProvider = ThemeProvider();

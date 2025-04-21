@@ -7,6 +7,15 @@ set -e
 echo "Initializing Flutter build..."
 FLUTTER_PATH="/sdks/flutter/bin/flutter"
 
+# Load environment variables
+echo "Loading environment configuration..."
+if [ -f "load_env.sh" ]; then
+  chmod +x load_env.sh
+  ./load_env.sh
+else
+  echo "Warning: load_env.sh not found. Using default configuration."
+fi
+
 # Create local.properties with the correct Flutter and Android SDK paths
 mkdir -p android
 echo "flutter.sdk=/sdks/flutter" > android/local.properties
@@ -178,4 +187,4 @@ else
   echo "Checking build directory:"
   ls -la build/app/outputs/flutter-apk/ || echo "Directory not found"
   exit 1
-fi 
+fi

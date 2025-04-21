@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'env_config.dart';
+import 'network_config.dart';
 
-// For non-web platforms
-import 'dart:io' show Platform;
+// Only import Platform for non-web platforms when needed
+// This is handled inside NetworkConfig now
 
 class AppConfig {
-  // API Configuration
-  static const String apiUrl = 'http://10.0.2.2:8000/api'; // For Android Emulator
-  // static const String apiUrl = 'http://localhost:8000/api'; // For iOS Simulator
-  // static const String apiUrl = 'https://your-production-api.com/api'; // For Production
+  // API Configuration - dynamically determined from environment
+  static String get apiUrl => NetworkConfig.getApiUrl();
   
   // Alias for backward compatibility
   static String get apiBaseUrl => apiUrl;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'api_diagnostics_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -316,10 +317,27 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                   if (_errorMessage != null) ...[                    
                     const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (_errorMessage!.contains('Connection error'))
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ApiDiagnosticsScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text('Diagnose API Connection'),
+                          ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 24),
